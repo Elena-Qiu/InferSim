@@ -1,4 +1,4 @@
-name: Tests
+name: tests
 
 on: [push, pull_request]
 
@@ -14,7 +14,9 @@ jobs:
         #- windows-latest
     steps:
     - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
+    # rustup show will read the rust-toolchain file and automatically install
+    - name: Setup rust
+      run: rustup show
 
     - name: Run cargo test
       uses: actions-rs/cargo@v1

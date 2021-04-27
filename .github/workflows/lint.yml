@@ -1,4 +1,4 @@
-name: Linter
+name: linter
 
 on: [push, pull_request]
 
@@ -7,16 +7,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
+    # rustup show will read the rust-toolchain file and automatically install
+    - name: Setup rust
+      run: rustup show
     - uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         args: --all-features
+
   format_check:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - uses: actions-rs/toolchain@v1
+    # rustup show will read the rust-toolchain file and automatically install
+    - name: Setup rust
+      run: rustup show
     - name: Run cargo fmt
       uses: actions-rs/cargo@v1
       with:

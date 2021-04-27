@@ -1,9 +1,9 @@
 # InferSim
 
-[![license](https://img.shields.io/github/license/Aetf/InferSim)](https://github.com/Aetf/InferSim)
-![lint](https://github.com/Aetf/InferSim/workflows/lint/badge.svg)
-![tests](https://github.com/Aetf/InferSim/workflows/tests/badge.svg)
-[![codecov](https://codecov.io/gh/InferSim/InferSim/branch/main/graph/badge.svg)](https://codecov.io/gh/InferSim/InferSim)
+![license](https://img.shields.io/badge/license-MIT/Apache--2.0-blue)
+[![linter](https://img.shields.io/github/workflow/status/Aetf/InferSim/linter?label=linter)][workflow-linter]
+[![tests](https://img.shields.io/github/workflow/status/Aetf/InferSim/tests?label=tests)][workflow-tests]
+[![codecov](https://img.shields.io/codecov/c/github/Aetf/InferSim)][codecov]
 
 Simulator for Dynamic DNN serving, focusing on the variance of inference latency of incoming requests.
 
@@ -31,3 +31,7 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+[codecov]: https://codecov.io/gh/InferSim/InferSim
+[workflow-tests]: https://github.com/Aetf/InferSim/actions/workflows/tests.yml
+[workflow-linter]: https://github.com/Aetf/InferSim/actions/workflows/linter.yml

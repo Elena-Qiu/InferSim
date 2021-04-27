@@ -9,8 +9,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Install stable toolchain
-      uses: actions-rs/toolchain@v1
+    # rustup show will read the rust-toolchain file and automatically install
+    - name: Setup rust
+      run: rustup show
 
     - name: Run cargo-tarpaulin
       uses: actions-rs/tarpaulin@v0.1
