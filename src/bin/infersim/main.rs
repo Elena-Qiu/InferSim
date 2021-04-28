@@ -1,3 +1,4 @@
+use infersim::utils::logging::prelude::*;
 use infersim::utils::{self, AppConfig, Result};
 
 mod cli;
@@ -13,6 +14,8 @@ fn main() -> Result<()> {
 
     // initialize Configuration
     AppConfig::init(Some(DEFAULT_CONFIG))?;
+
+    trace!("Start cli execution");
 
     // Match Commands
     cli::execute()

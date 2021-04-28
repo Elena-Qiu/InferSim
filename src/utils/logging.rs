@@ -1,9 +1,13 @@
-use slog::o;
-use slog::Drain;
-use slog_syslog::Facility;
+use slog::Drain as _;
+use slog_scope::GlobalLoggerGuard;
 
 use super::error::Result;
-use slog_scope::GlobalLoggerGuard;
+use prelude::*;
+
+pub mod prelude {
+    pub use slog::o;
+    pub use slog_scope::{crit, debug, error, info, trace, warn};
+}
 
 /// Basic setup
 pub fn setup() -> Result<GlobalLoggerGuard> {
@@ -16,19 +20,25 @@ pub fn setup() -> Result<GlobalLoggerGuard> {
 
 /// Apply settings from config
 pub fn apply_config() -> Result<()> {
-    todo!()
+    warn!("STUB"; "what" => "logging::apply_config");
+    Ok(())
 }
 
 pub fn default_root_logger() -> Result<slog::Logger> {
     // Create drains
-    let syslog_drain = default_syslog_drain().unwrap_or(default_discard()?);
-    let term_drain = default_term_drain().unwrap_or(default_discard()?);
+    let drain = default_term_drain().unwrap_or(default_discard()?);
 
-    // Merge drains
-    let drain = slog::Duplicate(syslog_drain, term_drain).fuse();
-
-    // Create Logger
-    let logger = slog::Logger::root(drain, o!("who" => "InferSim"));
+    // Optionally duplicate to syslog
+    let logger = if cfg!(syslog) {
+        let syslog_drain = default_syslog_drain().unwrap_or(default_discard()?);
+        // Merge drains
+        let drain = slog::Duplicate(syslog_drain, drain).fuse();
+        // Create Logger
+        slog::Logger::root(drain, o!("who" => "InferSim"))
+    } else {
+        // Create Logger
+        slog::Logger::root(drain.fuse(), o!("who" => "InferSim"))
+    };
 
     // Return Logger
     Ok(logger)
@@ -50,11 +60,16 @@ fn default_term_drain() -> Result<slog_async::Async> {
     Ok(drain)
 }
 
-// syslog drain: Log to syslog
+/// syslog drain: Log to syslog
+#[cfg(syslog)]
 fn default_syslog_drain() -> Result<slog_async::Async> {
-    let syslog = slog_syslog::unix_3164(Facility::LOG_USER)?;
+    let syslog = slog_syslog::unix_3164(slog_syslog::Facility::LOG_USER)?;
 
     let drain = slog_async::Async::default(syslog.fuse());
 
     Ok(drain)
+}
+#[cfg(not(syslog))]
+fn default_syslog_drain() -> Result<slog_async::Async> {
+    unreachable!()
 }

@@ -1,5 +1,7 @@
-use crate::{AppConfig, Result};
 use structopt::StructOpt;
+
+use crate::utils::logging::prelude::*;
+use crate::{AppConfig, Result};
 
 /// Should be implemented by individual subcommand
 pub trait Cmd {
@@ -25,8 +27,8 @@ pub struct Run {}
 
 impl Cmd for Run {
     fn run(self) -> Result<()> {
-        log::info!("Run");
-        todo!()
+        info!("Run");
+        infersim::run_sim()
     }
 }
 
@@ -36,7 +38,7 @@ pub struct Step {}
 
 impl Cmd for Step {
     fn run(self) -> Result<()> {
-        log::info!("Step");
+        info!("Step");
         todo!()
     }
 }
