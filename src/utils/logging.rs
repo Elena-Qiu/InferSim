@@ -16,8 +16,7 @@ pub fn setup() -> Result<GlobalLoggerGuard> {
 
 /// Apply settings from config
 pub fn apply_config() -> Result<()> {
-    todo!();
-    Ok(())
+    todo!()
 }
 
 pub fn default_root_logger() -> Result<slog::Logger> {
