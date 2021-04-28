@@ -7,8 +7,6 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    ClapError(#[from] clap::Error),
-    #[error(transparent)]
     Others(#[from] anyhow::Error),
 }
 

@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::sync::RwLock;
 
 use super::error::Result;
+use std::path::Path;
 
 // CONFIG static variable. It's actually an AppConfig
 // inside an RwLock.
@@ -25,18 +26,16 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn init(default_config: Option<&str>) -> Result<()> {
+        // Start with empty
         let mut settings = Config::new();
 
-        // Embed file into executable
-        // This macro will embed the configuration file into the
-        // executable. Check include_str! for more info.
+        // Merge with default config
         if let Some(config_contents) = default_config {
-            //let contents = include_str!(config_file_path);
             settings.merge(config::File::from_str(&config_contents, config::FileFormat::Toml))?;
         }
 
         // Merge settings with env variables
-        settings.merge(Environment::with_prefix("APP"))?;
+        settings.merge(Environment::with_prefix("INFERSIM"))?;
 
         // TODO: Merge settings with Clap Settings Arguments
 
@@ -49,14 +48,11 @@ impl AppConfig {
         Ok(())
     }
 
-    pub fn merge_config(config_file: Option<&str>) -> Result<()> {
+    pub fn merge_config(config_file: Option<&Path>) -> Result<()> {
         // Merge settings with config file if there is one
         if let Some(config_file_path) = config_file {
             {
-                CONFIG
-                    .write()
-                    .unwrap()
-                    .merge(config::File::with_name(config_file_path))?;
+                CONFIG.write().unwrap().merge(config::File::from(config_file_path))?;
             }
         }
         Ok(())

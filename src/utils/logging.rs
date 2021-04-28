@@ -5,12 +5,19 @@ use slog_syslog::Facility;
 use super::error::Result;
 use slog_scope::GlobalLoggerGuard;
 
+/// Basic setup
 pub fn setup() -> Result<GlobalLoggerGuard> {
     // Setup Logging
     let guard = slog_scope::set_global_logger(default_root_logger()?);
     slog_stdlog::init().unwrap();
 
     Ok(guard)
+}
+
+/// Apply settings from config
+pub fn apply_config() -> Result<()> {
+    todo!();
+    Ok(())
 }
 
 pub fn default_root_logger() -> Result<slog::Logger> {

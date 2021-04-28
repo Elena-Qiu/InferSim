@@ -33,7 +33,7 @@ slog-async = "2.5.0"
 slog-stdlog = "4.1.0"
 log = "0.4.11"
 # cli
-clap = { version = "2.33.3", features = ["yaml"] }
+structopt = "0.3.21"
 # business logic
 desim = "0.2.0"
 

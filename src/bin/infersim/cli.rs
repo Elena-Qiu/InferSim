@@ -1,51 +1,59 @@
-use clap::{crate_authors, crate_description, crate_version};
-use clap::{App, AppSettings, Arg};
+use std::path::PathBuf;
 
-use crate::commands;
+use structopt::clap::AppSettings;
+use structopt::StructOpt;
+
+use crate::commands::{self, Cmd};
+use crate::utils;
 use crate::{AppConfig, Result};
 
-/// Match commands
-pub fn cli_match() -> Result<()> {
-    // Get matches
-    let cli_matches = cli_config()?;
-
-    // Merge clap config file if the value is set
-    AppConfig::merge_config(cli_matches.value_of("config"))?;
-
-    // Matches Commands or display help
-    match cli_matches.subcommand_name() {
-        Some("config") => {
-            commands::config()?;
-        }
-        _ => {
-            // Arguments are required by default (in Clap)
-            // This section should never execute and thus
-            // should probably be logged in case it executed.
-        }
-    }
-    Ok(())
+#[derive(StructOpt)]
+#[structopt(
+    setting = AppSettings::SubcommandRequiredElseHelp,
+    setting = AppSettings::UnifiedHelpMessage,
+    setting = AppSettings::VersionlessSubcommands,
+    global_setting = AppSettings::ColoredHelp,
+)]
+pub struct CLI {
+    /// Set a custom config file
+    #[structopt(short, long, value_name = "FILE", parse(from_os_str))]
+    config: Option<PathBuf>,
+    #[structopt(subcommand)]
+    cmd: Command,
 }
 
-/// Configure Clap
-/// This function will configure clap and match arguments
-pub fn cli_config() -> Result<clap::ArgMatches<'static>> {
-    let cli_app = App::new("InferSim")
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .version(crate_version!())
-        .about(crate_description!())
-        .author(crate_authors!("\n"))
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .help("Set a custom config file")
-                .takes_value(true)
-                .value_name("FILE"),
-        )
-        .subcommand(App::new("config").about("Show Configuration"));
+/// A macro to create a enum holding all subcommands
+/// and also forwarding the Cmd trait impl to inner.
+macro_rules! make_command {
+    ($($x:ident),*) => {
+        #[derive(StructOpt)]
+        enum Command {
+            $(
+                $x(commands::$x),
+            )*
+        }
 
-    // Get matches
-    let cli_matches = cli_app.get_matches();
+        impl Cmd for Command {
+            fn run(self) -> Result<()> {
+                match self {
+                    $(
+                        Command::$x(inner) => inner.run(),
+                    )*
+                }
+            }
+        }
+    };
+}
 
-    Ok(cli_matches)
+make_command![Config, Run, Step];
+
+pub fn execute() -> Result<()> {
+    let cli = CLI::from_args();
+    // handle global options
+    AppConfig::merge_config(cli.config.as_deref())?;
+
+    // apply settings from config
+    utils::logging::apply_config()?;
+
+    cli.cmd.run()
 }
