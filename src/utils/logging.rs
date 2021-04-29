@@ -34,10 +34,10 @@ pub fn default_root_logger() -> Result<slog::Logger> {
         // Merge drains
         let drain = slog::Duplicate(syslog_drain, drain).fuse();
         // Create Logger
-        slog::Logger::root(drain, o!("who" => "InferSim"))
+        slog::Logger::root(drain, o!())
     } else {
         // Create Logger
-        slog::Logger::root(drain.fuse(), o!("who" => "InferSim"))
+        slog::Logger::root(drain.fuse(), o!())
     };
 
     // Return Logger
