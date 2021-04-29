@@ -241,8 +241,6 @@ dependencies = [
 [[package]]
 name = "desim"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d0939a7bba2988a30bcd6f62d5414b92130291730550f0627194d7e3239e437"
 
 [[package]]
 name = "difference"
