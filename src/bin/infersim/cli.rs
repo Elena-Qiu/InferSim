@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 
 use structopt::clap::AppSettings;
@@ -5,6 +6,7 @@ use structopt::StructOpt;
 
 use crate::commands::{self, Cmd};
 use crate::utils;
+use crate::utils::logging::prelude::*;
 use crate::{AppConfig, Result};
 
 #[derive(StructOpt)]
@@ -37,7 +39,20 @@ macro_rules! make_command {
             fn run(self) -> Result<()> {
                 match self {
                     $(
-                        Command::$x(inner) => inner.run(),
+                        Command::$x(inner) => {
+                            let _s = info_span!(concat!("cmd:", stringify!($x))).entered();
+                            inner.run()
+                        },
+                    )*
+                }
+            }
+        }
+
+        impl fmt::Display for Command {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(
+                        Command::$x(_) => write!(f, concat!("Command::", stringify!($x))),
                     )*
                 }
             }

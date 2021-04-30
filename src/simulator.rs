@@ -1,8 +1,10 @@
+use std::collections::VecDeque;
+use std::fmt;
+
 use desim::{Effect, SimContext, SimGen, SimState, Simulation};
 
 use crate::utils::logging::prelude::*;
 use crate::{Batch, Job};
-use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
 pub enum SchedulerState {
@@ -13,6 +15,16 @@ pub enum SchedulerState {
     /// State/event injected by the runner for all incoming jobs
     /// should not be returned by the scheduler itself
     IncomingJobs { jobs: Vec<Job> },
+}
+
+impl fmt::Display for SchedulerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BatchDone(batch) => write!(f, "BatchDone({})", batch),
+            SchedulerState::Idle => write!(f, "Idle"),
+            SchedulerState::IncomingJobs { jobs } => write!(f, "IncomingJobs {{ jobs.len: {} }}", jobs.len()),
+        }
+    }
 }
 
 impl Default for SchedulerState {
@@ -38,7 +50,7 @@ impl SimState for SchedulerState {
     fn get_effect(&self) -> Effect {
         match self {
             SchedulerState::IncomingJobs { .. } => {
-                error!("Scheduler should not return IncomingJobs");
+                error!(?self, "Scheduler should not return IncomingJobs");
                 Effect::Trace
             }
             SchedulerState::BatchDone(batch) => Effect::TimeOut(batch.latency()),
@@ -66,25 +78,31 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Sched
     Box::new(move |mut ctx: SimContext<SchedulerState>| {
         let mut pending_jobs = VecDeque::new();
         loop {
-            let time = ctx.time();
-            let prev = ctx.into_state();
-            info!("@{:.2} {:?}", time, &prev);
-            let next = match prev {
-                SchedulerState::IncomingJobs { jobs, .. } => {
-                    // new jobs coming in before current batch finish
-                    pending_jobs.extend(jobs.into_iter());
-                    scheduler.on_new_jobs(&mut pending_jobs)
-                }
-                SchedulerState::BatchDone(batch) => {
-                    // current batch finished
-                    scheduler.on_batch_done(&batch, &mut pending_jobs)
-                }
-                SchedulerState::Idle => {
-                    // the scheduler doesn't want to do anything
-                    // or there's nothing to do
-                    // this essentially pass the control back to incoming_jobs_process
-                    SchedulerState::wait()
-                }
+            let next = {
+                let time = ctx.time();
+                let curr = ctx.into_state();
+                let s = debug_span!("scheduler_iter", %time, %curr);
+                let _g = s.enter();
+
+                let next = match curr {
+                    SchedulerState::IncomingJobs { jobs, .. } => {
+                        // new jobs coming in before current batch finish
+                        pending_jobs.extend(jobs.into_iter());
+                        scheduler.on_new_jobs(&mut pending_jobs)
+                    }
+                    SchedulerState::BatchDone(batch) => {
+                        // current batch finished
+                        scheduler.on_batch_done(&batch, &mut pending_jobs)
+                    }
+                    SchedulerState::Idle => {
+                        // the scheduler doesn't want to do anything
+                        // or there's nothing to do
+                        // this essentially pass the control back to incoming_jobs_process
+                        SchedulerState::wait()
+                    }
+                };
+                info!(%next, "generated next state");
+                next
             };
             ctx = yield next;
         }

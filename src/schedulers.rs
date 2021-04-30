@@ -6,6 +6,7 @@ use crate::utils::logging::prelude::*;
 use crate::{Batch, Job};
 
 /// The simplest FIFO scheduler, with a fixed batch size of 5
+#[derive(Debug)]
 pub struct FIFO {
     batch_size: usize,
     running: bool,
@@ -33,6 +34,14 @@ impl FIFO {
 }
 
 impl Scheduler for FIFO {
+    #[instrument(
+        level = "debug",
+        skip(self, pending_jobs),
+        fields(
+            %self.running,
+            pending_jobs.len = pending_jobs.len()
+        )
+    )]
     fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SchedulerState {
         // FIFO does not preempt
         if self.running {
@@ -42,6 +51,14 @@ impl Scheduler for FIFO {
         }
     }
 
+    #[instrument(
+        level = "debug",
+        skip(self, pending_jobs),
+        fields(
+            %self.running,
+            pending_jobs.len = pending_jobs.len()
+        )
+    )]
     fn on_batch_done(&mut self, _: &Batch, pending_jobs: &mut VecDeque<Job>) -> SchedulerState {
         self.running = false;
         self.next_batch(pending_jobs)

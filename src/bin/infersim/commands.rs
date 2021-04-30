@@ -27,7 +27,6 @@ pub struct Run {}
 
 impl Cmd for Run {
     fn run(self) -> Result<()> {
-        info!("Run");
         infersim::run_sim()
     }
 }
