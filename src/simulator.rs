@@ -6,8 +6,9 @@ use desim::{Effect, SimContext, SimGen, SimState, Simulation};
 use crate::utils::logging::prelude::*;
 use crate::{Batch, Job};
 
+/// The simulation state
 #[derive(Debug, Clone)]
-pub enum SchedulerState {
+pub enum SystemState {
     /// Run this batch of jobs
     BatchDone(Batch),
     /// Wait until something happens
@@ -17,23 +18,7 @@ pub enum SchedulerState {
     IncomingJobs { jobs: Vec<Job> },
 }
 
-impl fmt::Display for SchedulerState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BatchDone(batch) => write!(f, "BatchDone({})", batch),
-            SchedulerState::Idle => write!(f, "Idle"),
-            SchedulerState::IncomingJobs { jobs } => write!(f, "IncomingJobs {{ jobs.len: {} }}", jobs.len()),
-        }
-    }
-}
-
-impl Default for SchedulerState {
-    fn default() -> Self {
-        Self::Idle
-    }
-}
-
-impl SchedulerState {
+impl SystemState {
     pub fn incoming_jobs(jobs: Vec<Job>) -> Self {
         Self::IncomingJobs { jobs }
     }
@@ -45,16 +30,32 @@ impl SchedulerState {
     }
 }
 
+impl fmt::Display for SystemState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BatchDone(batch) => write!(f, "BatchDone({})", batch),
+            SystemState::Idle => write!(f, "Idle"),
+            SystemState::IncomingJobs { jobs } => write!(f, "IncomingJobs {{ jobs.len: {} }}", jobs.len()),
+        }
+    }
+}
+
+impl Default for SystemState {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
+
 // Implement SimState for reference, so both SchedulerEvent itself and SimStateType can get the impl
-impl SimState for SchedulerState {
+impl SimState for SystemState {
     fn get_effect(&self) -> Effect {
         match self {
-            SchedulerState::IncomingJobs { .. } => {
+            SystemState::IncomingJobs { .. } => {
                 error!(?self, "Scheduler should not return IncomingJobs");
                 Effect::Trace
             }
-            SchedulerState::BatchDone(batch) => Effect::TimeOut(batch.latency()),
-            SchedulerState::Idle => Effect::Wait,
+            SystemState::BatchDone(batch) => Effect::TimeOut(batch.latency()),
+            SystemState::Idle => Effect::Wait,
         }
     }
 
@@ -69,13 +70,13 @@ impl SimState for SchedulerState {
 
 /// Scheduler mostly just react on events
 pub trait Scheduler {
-    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SchedulerState;
-    fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SchedulerState;
+    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState;
+    fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState;
 }
 
 /// The scheduler process will take incoming jobs and create batches from them
-fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<SchedulerState>> {
-    Box::new(move |mut ctx: SimContext<SchedulerState>| {
+fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<SystemState>> {
+    Box::new(move |mut ctx: SimContext<SystemState>| {
         let mut pending_jobs = VecDeque::new();
         loop {
             let next = {
@@ -85,20 +86,20 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Sched
                 let _g = s.enter();
 
                 let next = match curr {
-                    SchedulerState::IncomingJobs { jobs, .. } => {
+                    SystemState::IncomingJobs { jobs, .. } => {
                         // new jobs coming in before current batch finish
                         pending_jobs.extend(jobs.into_iter());
                         scheduler.on_new_jobs(&mut pending_jobs)
                     }
-                    SchedulerState::BatchDone(batch) => {
+                    SystemState::BatchDone(batch) => {
                         // current batch finished
                         scheduler.on_batch_done(&batch, &mut pending_jobs)
                     }
-                    SchedulerState::Idle => {
+                    SystemState::Idle => {
                         // the scheduler doesn't want to do anything
                         // or there's nothing to do
                         // this essentially pass the control back to incoming_jobs_process
-                        SchedulerState::wait()
+                        SystemState::wait()
                     }
                 };
                 info!(%next, "generated next state");
@@ -109,7 +110,7 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Sched
     })
 }
 
-pub fn build_simulation<S, IJ, J>(scheduler: S, incoming_jobs: IJ) -> Simulation<SchedulerState>
+pub fn build_simulation<S, IJ, J>(scheduler: S, incoming_jobs: IJ) -> Simulation<SystemState>
 where
     S: Scheduler + 'static,
     IJ: IntoIterator<Item = (f64, J)>,
@@ -121,7 +122,7 @@ where
     // pump in incoming jobs as events ahead of time
     for (time, batch) in incoming_jobs.into_iter() {
         let jobs = batch.into_iter().collect();
-        sim.schedule_event(time, p_schedule, SchedulerState::incoming_jobs(jobs))
+        sim.schedule_event(time, p_schedule, SystemState::incoming_jobs(jobs))
     }
 
     sim

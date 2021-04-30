@@ -1,7 +1,7 @@
 use std::cmp::min;
 use std::collections::VecDeque;
 
-use crate::simulator::{Scheduler, SchedulerState};
+use crate::simulator::{Scheduler, SystemState};
 use crate::utils::logging::prelude::*;
 use crate::{Batch, Job};
 
@@ -20,16 +20,16 @@ impl FIFO {
         }
     }
 
-    fn next_batch(&mut self, pending_jobs: &mut VecDeque<Job>) -> SchedulerState {
+    fn next_batch(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         let batch_size = min(self.batch_size, pending_jobs.len());
         if batch_size == 0 {
-            return SchedulerState::wait();
+            return SystemState::wait();
         }
 
         assert!(!self.running);
         self.running = true;
         let batch = pending_jobs.drain(..batch_size).collect();
-        SchedulerState::batch(batch)
+        SystemState::batch(batch)
     }
 }
 
@@ -42,10 +42,10 @@ impl Scheduler for FIFO {
             pending_jobs.len = pending_jobs.len()
         )
     )]
-    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SchedulerState {
+    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         // FIFO does not preempt
         if self.running {
-            SchedulerState::wait()
+            SystemState::wait()
         } else {
             self.next_batch(pending_jobs)
         }
@@ -59,7 +59,7 @@ impl Scheduler for FIFO {
             pending_jobs.len = pending_jobs.len()
         )
     )]
-    fn on_batch_done(&mut self, _: &Batch, pending_jobs: &mut VecDeque<Job>) -> SchedulerState {
+    fn on_batch_done(&mut self, _: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         self.running = false;
         self.next_batch(pending_jobs)
     }
