@@ -2,3 +2,7 @@ debug = false
 
 [database]
 url = "custom database url"
+
+[presets.abc]
+debug = true
+dec = 1

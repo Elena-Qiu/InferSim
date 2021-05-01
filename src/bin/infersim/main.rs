@@ -1,10 +1,7 @@
-use infersim::utils::logging::prelude::*;
-use infersim::utils::{self, AppConfig, Result};
+use infersim::utils::{self, prelude::*};
 
 mod cli;
 mod commands;
-
-static DEFAULT_CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/default_config.toml"));
 
 fn main() -> Result<()> {
     // panic setup should be done early
@@ -13,7 +10,7 @@ fn main() -> Result<()> {
     let _guard = utils::logging::setup()?;
 
     // initialize Configuration
-    AppConfig::init(Some(DEFAULT_CONFIG))?;
+    utils::app_config::init()?;
 
     trace!("Start cli execution");
 

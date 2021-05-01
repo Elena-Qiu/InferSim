@@ -1,137 +1,186 @@
-use config::{Config, Environment};
-use lazy_static::lazy_static;
-use serde::Deserialize;
-use std::ops::Deref;
+use std::collections::HashMap;
+use std::path::Path;
 use std::sync::RwLock;
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+
+use config::{Environment, Source};
+use lazy_static::lazy_static;
 
 use super::error::Result;
-use std::path::Path;
 
-// CONFIG static variable. It's actually an AppConfig
-// inside an RwLock.
-lazy_static! {
-    static ref CONFIG: RwLock<Config> = RwLock::new(Config::new());
+static DEFAULT_CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/default_config.toml"));
+
+/// A new type to impl `config::Source`
+#[derive(Debug, Clone, serde::Deserialize)]
+struct Preset(HashMap<String, config::Value>);
+
+impl config::Source for Preset {
+    fn clone_into_box(&self) -> Box<dyn Source + Send + Sync> {
+        Box::new(self.clone())
+    }
+
+    fn collect(&self) -> std::result::Result<HashMap<String, config::Value>, config::ConfigError> {
+        let mut kv = self.0.clone();
+        // make sure it's not getting endlessly recursive
+        kv.remove("presets");
+        Ok(kv)
+    }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Database {
-    pub url: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AppConfig {
-    pub debug: bool,
-    pub database: Database,
-}
+/// The main structure holding application config
+pub struct AppConfig(config::Config);
 
 impl AppConfig {
-    pub fn init(default_config: Option<&str>) -> Result<()> {
+    fn new() -> Self {
         // Start with empty
-        let mut settings = Config::new();
+        Self(config::Config::new())
+    }
 
+    pub fn init(&mut self) -> Result<&mut Self> {
         // Merge with default config
-        if let Some(config_contents) = default_config {
-            settings.merge(config::File::from_str(&config_contents, config::FileFormat::Toml))?;
-        }
+        self.0
+            .merge(config::File::from_str(&DEFAULT_CONFIG, config::FileFormat::Toml))?;
 
         // Merge settings with env variables
-        settings.merge(Environment::with_prefix("INFERSIM"))?;
+        self.0.merge(Environment::with_prefix("INFERSIM"))?;
 
-        // TODO: Merge settings with Clap Settings Arguments
-
-        // Save Config to RwLoc
-        {
-            let mut w = CONFIG.write().unwrap();
-            *w = settings;
-        }
-
-        Ok(())
+        Ok(self)
     }
 
-    pub fn merge_config(config_file: Option<&Path>) -> Result<()> {
-        // Merge settings with config file if there is one
-        if let Some(config_file_path) = config_file {
-            {
-                CONFIG.write().unwrap().merge(config::File::from(config_file_path))?;
-            }
-        }
-        Ok(())
+    /// Load config from a file
+    pub fn use_file(&mut self, path: &Path) -> Result<&mut Self> {
+        self.0.merge(config::File::from(path))?;
+        Ok(self)
     }
 
-    // Set CONFIG
-    pub fn set(key: &str, value: &str) -> Result<()> {
-        {
-            // Set Property
-            CONFIG.write().unwrap().set(key, value)?;
-        }
-
-        Ok(())
+    /// Load preset
+    pub fn use_preset(&mut self, name: &str) -> Result<&mut Self> {
+        // load the preset
+        let preset: Preset = self.get(format!("presets.{}", name))?;
+        self.0.merge(preset)?;
+        Ok(self)
     }
 
-    // Get a single value
-    pub fn get<'de, T>(key: &'de str) -> Result<T>
+    /// Get a single value and deserialize to the given type
+    pub fn get<T, K>(&self, key: K) -> Result<T>
     where
-        T: serde::Deserialize<'de>,
+        // use DeserializeOwned, because we are reading CONFIG using RWLock
+        // and the lock is released before returning. So T should not borrow
+        // anything from CONFIG.
+        T: serde::de::DeserializeOwned,
+        K: AsRef<str>,
     {
-        Ok(CONFIG.read().unwrap().get::<T>(key)?)
+        Ok(self.0.get(key.as_ref())?)
     }
 
-    // Get CONFIG
-    // This clones Config (from RwLock<Config>) into a new AppConfig object.
-    // This means you have to fetch this again if you changed the configuration.
-    pub fn fetch() -> Result<AppConfig> {
-        // Get a Read Lock from RwLock
-        let r = CONFIG.read().unwrap();
-
-        // Clone the Config object
-        let config_clone = r.deref().clone();
-
-        // Coerce Config into AppConfig
-        Ok(config_clone.try_into()?)
+    /// Get a single value and deserialize to the given type
+    pub fn fetch<T>(&self) -> Result<T>
+    where
+        // use DeserializeOwned, because we are reading CONFIG using RWLock
+        // and the lock is released before returning. So T should not borrow
+        // anything from CONFIG.
+        T: serde::de::DeserializeOwned,
+    {
+        let t = self.0.clone().try_into()?;
+        Ok(t)
     }
+}
+
+/// Purely for config dump
+pub type DumpableConfig = HashMap<String, config::Value>;
+
+lazy_static! {
+    /// global AppConfig instance
+    static ref CONFIG: RwLock<AppConfig> = RwLock::new(AppConfig::new());
+}
+
+pub fn init() -> Result<()> {
+    config_mut().init()?;
+    Ok(())
+}
+
+/// global AppConfig instance
+pub fn config() -> RwLockReadGuard<'static, AppConfig> {
+    CONFIG.read().unwrap()
+}
+
+/// mutable global AppConfig instance
+pub fn config_mut() -> RwLockWriteGuard<'static, AppConfig> {
+    CONFIG.write().unwrap()
+}
+
+pub mod prelude {
+    pub use super::{config, config_mut};
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
 
-    static TEST_CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/test_config.toml"));
+    fn test_config() -> AppConfig {
+        let mut config = AppConfig::new();
+        config.init().unwrap();
+        config
+            .use_file(Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/resources/test_config.toml"
+            )))
+            .unwrap();
+
+        config
+    }
 
     #[test]
     fn fetch_config() {
         // Initialize configuration
-        AppConfig::init(Some(TEST_CONFIG)).unwrap();
+        let config = test_config();
+
+        #[derive(Deserialize)]
+        struct Database {
+            url: String,
+        }
+        #[derive(Deserialize)]
+        struct Fragment {
+            debug: bool,
+            database: Database,
+        }
 
         // Fetch an instance of Config
-        let config = AppConfig::fetch().unwrap();
+        let frag: Fragment = config.fetch().unwrap();
 
         // Check the values
-        assert_eq!(config.debug, false);
-        assert_eq!(config.database.url, "custom database url");
+        assert!(!frag.debug);
+        assert_eq!(frag.database.url, "custom database url");
     }
 
     #[test]
     fn verify_get() {
         // Initialize configuration
-        AppConfig::init(Some(TEST_CONFIG)).unwrap();
+        let config = test_config();
+
+        let debug: bool = config.get("debug").unwrap();
+        let url: String = config.get("database.url").unwrap();
 
         // Check value with get
-        assert_eq!(AppConfig::get::<bool>("debug").unwrap(), false);
-        assert_eq!(AppConfig::get::<String>("database.url").unwrap(), "custom database url");
+        assert!(!debug);
+        assert_eq!(url, "custom database url");
     }
 
     #[test]
-    fn verify_set() {
-        // Initialize configuration
-        AppConfig::init(Some(TEST_CONFIG)).unwrap();
+    fn profile() {
+        let mut config = test_config();
 
-        // Set a field
-        AppConfig::set("database.url", "new url").unwrap();
+        // the global value
+        let debug: bool = config.get("debug").unwrap();
+        assert!(!debug);
 
-        // Fetch a new instance of Config
-        let config = AppConfig::fetch().unwrap();
+        config.use_preset("abc").unwrap();
+        // value from preset
+        let debug: bool = config.get("debug").unwrap();
+        assert!(debug);
 
-        // Check value was modified
-        assert_eq!(config.database.url, "new url");
+        let dec: usize = config.get("dec").unwrap();
+        assert_eq!(dec, 1);
     }
 }

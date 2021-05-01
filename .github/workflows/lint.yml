@@ -13,7 +13,7 @@ jobs:
     - uses: actions-rs/clippy-check@v1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        args: --all-features
+        args: --all-features -- --no-deps
 
   format_check:
     runs-on: ubuntu-latest

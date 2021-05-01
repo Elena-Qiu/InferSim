@@ -5,9 +5,7 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 use crate::commands::{self, Cmd};
-use crate::utils;
-use crate::utils::logging::prelude::*;
-use crate::{AppConfig, Result};
+use crate::utils::prelude::*;
 
 #[derive(StructOpt)]
 #[structopt(
@@ -65,10 +63,10 @@ make_command![Config, Run, Step];
 pub fn execute() -> Result<()> {
     let cli = CLI::from_args();
     // handle global options
-    AppConfig::merge_config(cli.config.as_deref())?;
-
-    // apply settings from config
-    utils::logging::apply_config()?;
+    // load config file
+    if let Some(path) = cli.config {
+        config_mut().use_file(&path)?;
+    }
 
     cli.cmd.run()
 }

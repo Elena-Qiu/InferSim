@@ -1,4 +1,4 @@
+output_file = "timeline.json"
 debug = false
 
-[database]
-url = "custom database url"
+[presets]

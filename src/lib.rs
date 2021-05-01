@@ -12,8 +12,7 @@ mod simulator;
 pub mod utils;
 
 use crate::simulator::build_simulation;
-use utils::logging::prelude::*;
-use utils::Result;
+use utils::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Job {
