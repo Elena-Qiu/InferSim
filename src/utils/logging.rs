@@ -22,7 +22,7 @@ pub fn setup() -> Result<GlobalLoggingGuard> {
     // Setup Logging
     let (non_blocking, guard) = tracing_appender::non_blocking::NonBlockingBuilder::default()
         .lossy(false)
-        .finish(std::io::stdout());
+        .finish(std::io::stderr());
     let filter = tracing_subscriber::EnvFilter::from_default_env()
         // base level if not matched by any directive in env var
         .add_directive(LevelFilter::INFO.into());

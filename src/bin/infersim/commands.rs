@@ -13,8 +13,11 @@ pub struct Config {}
 
 impl Cmd for Config {
     fn run(self) -> Result<()> {
-        let config: utils::app_config::DumpableConfig = config().fetch()?;
-        println!("{:#?}", config);
+        let config: toml::Value = config().fetch()?;
+        println!(
+            "{}",
+            toml::to_string_pretty(&config).expect("toml can't format its own value!")
+        );
 
         Ok(())
     }
