@@ -7,20 +7,12 @@ pub trait Cmd {
     fn run(self) -> Result<()>;
 }
 
-/// Show the configuration file
+/// Dump the current active configuration as toml
 #[derive(StructOpt)]
-pub struct Config {
-    preset: Option<String>,
-}
+pub struct Config {}
 
 impl Cmd for Config {
     fn run(self) -> Result<()> {
-        if let Some(preset) = self.preset {
-            config_mut().use_preset(&preset)?;
-        }
-        // apply settings from config
-        utils::logging::apply_config()?;
-
         let config: utils::app_config::DumpableConfig = config().fetch()?;
         println!("{:#?}", config);
 
@@ -30,18 +22,10 @@ impl Cmd for Config {
 
 /// Run simulation end-to-end
 #[derive(StructOpt)]
-pub struct Run {
-    preset: Option<String>,
-}
+pub struct Run {}
 
 impl Cmd for Run {
     fn run(self) -> Result<()> {
-        if let Some(preset) = self.preset {
-            config_mut().use_preset(&preset)?;
-        }
-        // apply settings from config
-        utils::logging::apply_config()?;
-
         infersim::run_sim()
     }
 }
@@ -52,9 +36,6 @@ pub struct Step {}
 
 impl Cmd for Step {
     fn run(self) -> Result<()> {
-        // apply settings from config
-        utils::logging::apply_config()?;
-
         info!("Step");
         todo!()
     }

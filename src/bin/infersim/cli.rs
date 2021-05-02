@@ -7,17 +7,22 @@ use structopt::StructOpt;
 use crate::commands::{self, Cmd};
 use crate::utils::prelude::*;
 
+// usage has to be set statically to force `[preset]` appear at the end
 #[derive(StructOpt)]
 #[structopt(
     setting = AppSettings::SubcommandRequiredElseHelp,
     setting = AppSettings::UnifiedHelpMessage,
     setting = AppSettings::VersionlessSubcommands,
     global_setting = AppSettings::ColoredHelp,
+    usage = "infersim [OPTIONS] <SUBCOMMAND> [preset]"
 )]
 pub struct CLI {
     /// Set a custom config file
-    #[structopt(short, long, value_name = "FILE", parse(from_os_str))]
+    #[structopt(short, long, global = true, value_name = "FILE", parse(from_os_str))]
     config: Option<PathBuf>,
+    /// The config preset to load, if missing, the global default is used
+    #[structopt(global = true)]
+    preset: Option<String>,
     #[structopt(subcommand)]
     cmd: Command,
 }
@@ -67,6 +72,12 @@ pub fn execute() -> Result<()> {
     if let Some(path) = cli.config {
         config_mut().use_file(&path)?;
     }
+    // load preset
+    if let Some(preset) = cli.preset {
+        config_mut().use_preset(&preset)?;
+    }
+    // apply settings from config
+    utils::logging::apply_config()?;
 
     cli.cmd.run()
 }
