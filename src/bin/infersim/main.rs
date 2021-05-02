@@ -1,4 +1,4 @@
-use infersim::utils::{self, prelude::*};
+use infersim::utils::prelude::*;
 
 mod cli;
 mod commands;

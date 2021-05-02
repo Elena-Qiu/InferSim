@@ -1,6 +1,6 @@
 use structopt::StructOpt;
 
-use crate::utils::{self, prelude::*};
+use crate::utils::prelude::*;
 
 /// Should be implemented by individual subcommand
 pub trait Cmd {
