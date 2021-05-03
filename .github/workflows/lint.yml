@@ -6,7 +6,9 @@ jobs:
   clippy_check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
     # rustup show will read the rust-toolchain file and automatically install
     - name: Setup rust
       run: rustup show
@@ -18,7 +20,9 @@ jobs:
   format_check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
     # rustup show will read the rust-toolchain file and automatically install
     - name: Setup rust
       run: rustup show

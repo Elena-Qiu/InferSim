@@ -14,6 +14,8 @@ jobs:
         #- windows-latest
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
     # rustup show will read the rust-toolchain file and automatically install
     - name: Setup rust
       run: rustup show

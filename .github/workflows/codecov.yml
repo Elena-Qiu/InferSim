@@ -6,8 +6,9 @@ jobs:
   codecov:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
 
     # rustup show will read the rust-toolchain file and automatically install
     - name: Setup rust
