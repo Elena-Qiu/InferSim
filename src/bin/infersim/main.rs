@@ -7,13 +7,11 @@ fn main() -> Result<()> {
     // panic setup should be done early
     utils::panic::setup();
     // basic logging setup
-    let _guard = utils::logging::setup()?;
+    let mut logging = utils::logging::setup()?;
 
-    // initialize Configuration
-    utils::app_config::init()?;
+    // initialize configuration store
+    utils::app_config::setup()?;
 
-    trace!("Start cli execution");
-
-    // Match Commands
-    cli::execute()
+    // run cli
+    cli::execute(&mut logging)
 }

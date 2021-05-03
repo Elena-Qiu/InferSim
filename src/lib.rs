@@ -1,4 +1,4 @@
-#![feature(generators, generator_trait, backtrace)]
+#![feature(generators, generator_trait, backtrace, control_flow_enum)]
 
 use std::fmt;
 

@@ -36,7 +36,7 @@ impl AppConfig {
         Self(config::Config::new())
     }
 
-    pub fn init(&mut self) -> Result<&mut Self> {
+    pub fn setup(&mut self) -> Result<&mut Self> {
         // Merge with default config
         self.0
             .merge(config::File::from_str(&DEFAULT_CONFIG, config::FileFormat::Toml))?;
@@ -86,16 +86,13 @@ impl AppConfig {
     }
 }
 
-/// Purely for config dump
-pub type DumpableConfig = HashMap<String, config::Value>;
-
 lazy_static! {
     /// global AppConfig instance
     static ref CONFIG: RwLock<AppConfig> = RwLock::new(AppConfig::new());
 }
 
-pub fn init() -> Result<()> {
-    config_mut().init()?;
+pub fn setup() -> Result<()> {
+    config_mut().setup()?;
     Ok(())
 }
 
@@ -120,7 +117,7 @@ mod tests {
 
     fn test_config() -> AppConfig {
         let mut config = AppConfig::new();
-        config.init().unwrap();
+        config.setup().unwrap();
         config
             .use_file(Path::new(concat!(
                 env!("CARGO_MANIFEST_DIR"),

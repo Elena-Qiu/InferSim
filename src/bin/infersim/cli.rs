@@ -5,6 +5,7 @@ use structopt::clap::AppSettings;
 use structopt::StructOpt;
 
 use crate::commands::{self, Cmd};
+use crate::utils::logging::GlobalLoggingContext;
 use crate::utils::prelude::*;
 
 // usage has to be set statically to force `[preset]` appear at the end
@@ -49,6 +50,14 @@ macro_rules! make_command {
                     )*
                 }
             }
+
+            fn produces_output(&self) -> bool {
+                match self {
+                    $(
+                        Command::$x(inner) => inner.produces_output(),
+                    )*
+                }
+            }
         }
 
         impl fmt::Display for Command {
@@ -65,7 +74,7 @@ macro_rules! make_command {
 
 make_command![Config, Run, Step];
 
-pub fn execute() -> Result<()> {
+pub fn execute(logging: &mut GlobalLoggingContext) -> Result<()> {
     let cli = CLI::from_args();
     // handle global options
     // load config file
@@ -77,7 +86,7 @@ pub fn execute() -> Result<()> {
         config_mut().use_preset(&preset)?;
     }
     // apply settings from config
-    utils::logging::apply_config()?;
+    logging.reconfigure(cli.cmd.produces_output())?;
 
     cli.cmd.run()
 }

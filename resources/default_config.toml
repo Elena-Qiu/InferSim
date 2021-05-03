@@ -1,4 +1,33 @@
 output_file = "timeline.json"
-debug = false
+
+[logging]
+filter.directives = "INFO"
+filter.from_env = "RUST_LOG"
+
+[[logging.outputs]]
+enabled = true
+span_events = [
+    "Enter"
+]
+
+target.type = "term"
+# either stdout or stderr
+target.name = "stderr"
+# when name is "stdout", whether switch to "stderr" for commands that produce outputs on stdout
+target.auto_switch = true
+
+
+[[logging.outputs]]
+enabled = false
+span_events = [
+    "Enter"
+]
+
+filter.directives = "TRACE"
+filter.from_env = false
+
+target.type = "file"
+target.directory = "/tmp"
+target.name = "infersim.log"
 
 [presets]
