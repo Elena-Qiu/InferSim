@@ -10,6 +10,7 @@ use crate::{Batch, Job};
 pub struct FIFO {
     batch_size: usize,
     running: bool,
+    now: f64,
 }
 
 impl FIFO {
@@ -17,6 +18,7 @@ impl FIFO {
         FIFO {
             batch_size,
             running: false,
+            now: 0.0,
         }
     }
 
@@ -29,11 +31,15 @@ impl FIFO {
         assert!(!self.running);
         self.running = true;
         let batch = pending_jobs.drain(..batch_size).collect();
-        SystemState::batch(batch)
+        SystemState::batch(self.now, batch)
     }
 }
 
 impl Scheduler for FIFO {
+    fn on_tick(&mut self, now: f64) {
+        self.now = now;
+    }
+
     #[instrument(
         level = "debug",
         skip(self, pending_jobs),

@@ -24,8 +24,8 @@ impl SystemState {
     pub fn incoming_jobs(jobs: Vec<IncomingJob>) -> Self {
         Self::IncomingJobs { jobs }
     }
-    pub fn batch(jobs: Vec<Job>) -> Self {
-        Self::BatchDone(Batch { jobs })
+    pub fn batch(now: f64, jobs: Vec<Job>) -> Self {
+        Self::BatchDone(Batch { jobs, started: now })
     }
     pub fn wait() -> Self {
         Self::Idle
@@ -77,6 +77,7 @@ impl SimState for SystemState {
 
 /// Scheduler mostly just react on events
 pub trait Scheduler {
+    fn on_tick(&mut self, now: f64);
     fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState;
     fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState;
 }
@@ -98,6 +99,7 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Syste
                 }
                 pending_jobs
             };
+            scheduler.on_tick(time);
             let next = {
                 let _s = debug_span!("scheduler_iter", %time, %curr).entered();
 
