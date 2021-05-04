@@ -4,7 +4,7 @@ use std::fmt;
 use desim::{Effect, SimContext, SimGen, SimState, Simulation};
 
 use crate::utils::logging::prelude::*;
-use crate::{Batch, Job};
+use crate::{Batch, IncomingJob, Job};
 
 /// The simulation state
 #[derive(Debug, Clone)]
@@ -15,11 +15,13 @@ pub enum SystemState {
     Idle,
     /// State/event injected by the runner for all incoming jobs
     /// should not be returned by the scheduler itself
-    IncomingJobs { jobs: Vec<Job> },
+    IncomingJobs { jobs: Vec<IncomingJob> },
+    /// Some jobs are past due
+    JobsPastDue(Vec<Job>),
 }
 
 impl SystemState {
-    pub fn incoming_jobs(jobs: Vec<Job>) -> Self {
+    pub fn incoming_jobs(jobs: Vec<IncomingJob>) -> Self {
         Self::IncomingJobs { jobs }
     }
     pub fn batch(jobs: Vec<Job>) -> Self {
@@ -33,9 +35,10 @@ impl SystemState {
 impl fmt::Display for SystemState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BatchDone(batch) => write!(f, "BatchDone({})", batch),
+            SystemState::BatchDone(batch) => write!(f, "BatchDone({})", batch),
             SystemState::Idle => write!(f, "Idle"),
             SystemState::IncomingJobs { jobs } => write!(f, "IncomingJobs {{ jobs.len: {} }}", jobs.len()),
+            SystemState::JobsPastDue(jobs) => write!(f, "JobsPastDue( len: {} )", jobs.len()),
         }
     }
 }
@@ -52,6 +55,10 @@ impl SimState for SystemState {
         match self {
             SystemState::IncomingJobs { .. } => {
                 error!(?self, "Scheduler should not return IncomingJobs");
+                Effect::Trace
+            }
+            SystemState::JobsPastDue(_) => {
+                warn!(?self, "Some jobs are past due");
                 Effect::Trace
             }
             SystemState::BatchDone(batch) => Effect::TimeOut(batch.latency()),
@@ -77,30 +84,35 @@ pub trait Scheduler {
 /// The scheduler process will take incoming jobs and create batches from them
 fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<SystemState>> {
     Box::new(move |mut ctx: SimContext<SystemState>| {
-        let mut pending_jobs = VecDeque::new();
+        let mut pending_jobs: VecDeque<Job> = Default::default();
         loop {
+            let time = ctx.time();
+            let curr = ctx.into_state();
+            // handle past due jobs
+            pending_jobs = {
+                let (past_due, pending_jobs): (VecDeque<_>, _) =
+                    pending_jobs.into_iter().partition(|j| j.missed_deadline(time));
+                if !past_due.is_empty() {
+                    ctx = yield SystemState::JobsPastDue(past_due.into());
+                    assert!((time - ctx.time()).abs() < f64::EPSILON);
+                }
+                pending_jobs
+            };
             let next = {
-                let time = ctx.time();
-                let curr = ctx.into_state();
-                let s = debug_span!("scheduler_iter", %time, %curr);
-                let _g = s.enter();
+                let _s = debug_span!("scheduler_iter", %time, %curr).entered();
 
                 let next = match curr {
                     SystemState::IncomingJobs { jobs, .. } => {
-                        // new jobs coming in before current batch finish
-                        pending_jobs.extend(jobs.into_iter());
+                        // new jobs coming in, accept as pending jobs
+                        pending_jobs.extend(jobs.into_iter().map(|ij| ij.into_job(time)));
                         scheduler.on_new_jobs(&mut pending_jobs)
                     }
                     SystemState::BatchDone(batch) => {
                         // current batch finished
                         scheduler.on_batch_done(&batch, &mut pending_jobs)
                     }
-                    SystemState::Idle => {
-                        // the scheduler doesn't want to do anything
-                        // or there's nothing to do
-                        // this essentially pass the control back to incoming_jobs_process
-                        SystemState::wait()
-                    }
+                    // other states are irrelevant
+                    _ => SystemState::wait(),
                 };
                 info!(%next, "generated next state");
                 next
@@ -114,7 +126,7 @@ pub fn build_simulation<S, IJ, J>(scheduler: S, incoming_jobs: IJ) -> Simulation
 where
     S: Scheduler + 'static,
     IJ: IntoIterator<Item = (f64, J)>,
-    J: IntoIterator<Item = Job>,
+    J: IntoIterator<Item = IncomingJob>,
 {
     let mut sim = Simulation::new();
     let p_schedule = sim.create_process(schedule_process(scheduler));

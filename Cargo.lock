@@ -286,6 +286,7 @@ dependencies = [
  "lazy_static",
  "predicates",
  "rand",
+ "rand_distr",
  "rand_seeder",
  "serde",
  "structopt",

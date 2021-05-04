@@ -43,6 +43,7 @@ structopt = "0.3.21"
 desim = { path = "desim" }
 rand = "0.8.3"
 rand_seeder = "0.2.2"
+rand_distr = "0.4.0"
 toml = "0.5.8"
 
 [features]

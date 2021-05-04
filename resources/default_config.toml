@@ -1,4 +1,12 @@
 output_file = "timeline.json"
+[incoming]
+type = "OneBatch"
+delay = 0.0
+n_jobs = 100
+[incoming.spec.length]
+type = "Normal"
+mean = 50.0
+std_dev = 25.0
 
 [logging]
 filter.directives = "INFO"
