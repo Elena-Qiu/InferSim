@@ -6,6 +6,7 @@ use desim::EndCondition;
 use rand_seeder::{Seeder, SipRng};
 
 mod incoming;
+mod output;
 mod schedulers;
 mod simulator;
 pub mod utils;
@@ -92,7 +93,7 @@ impl Batch {
     }
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct SimConfig {
     seed: Option<String>,
     incoming: incoming::IncomingJobConfig,
@@ -110,11 +111,13 @@ pub fn run_sim() -> Result<()> {
     let scheduler = schedulers::FIFO::new(2);
 
     // build simulator
-    let sim = build_simulation(scheduler, incoming_jobs);
+    let mut sim = build_simulation(scheduler, incoming_jobs);
 
     // run!
     let _g = info_span!("sim_run").entered();
-    sim.run(EndCondition::NoEvents);
+    sim = sim.run(EndCondition::NoEvents);
+
+    output::render_chrome_trace(sim.processed_events())?;
 
     Ok(())
 }

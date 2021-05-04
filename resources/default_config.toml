@@ -1,3 +1,4 @@
+seed = "stripy zebra"
 output_file = "timeline.json"
 [incoming]
 type = "OneBatch"

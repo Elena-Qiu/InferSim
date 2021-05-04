@@ -19,6 +19,16 @@ pub enum Error {
 /// A type alias that forces the usage of the custom error type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+impl Error {
+    pub fn adhoc(msg: &'static str) -> Self {
+        Self::Others(anyhow!(msg))
+    }
+
+    pub fn invalid_config(msg: &'static str) -> Self {
+        Self::InvalidConfig(anyhow!(msg))
+    }
+}
+
 // ====== Logging ======
 
 impl From<tracing::subscriber::SetGlobalDefaultError> for Error {
@@ -74,12 +84,9 @@ impl From<rand_distr::ExpError> for Error {
     }
 }
 
-impl Error {
-    pub fn adhoc(msg: &'static str) -> Self {
-        Self::Others(anyhow!(msg))
-    }
-
-    pub fn invalid_config(msg: &'static str) -> Self {
-        Self::InvalidConfig(anyhow!(msg))
+// ====== Chrome Trace output ======
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Others(anyhow::Error::from(err))
     }
 }

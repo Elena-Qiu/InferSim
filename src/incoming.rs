@@ -40,7 +40,11 @@ where
             RandomVariable::Normal { mean, std_dev } => Box::new(Normal::new(*mean, *std_dev)?.sample_iter(rng)),
             RandomVariable::LogNormal { mean, std_dev } => Box::new(LogNormal::new(*mean, *std_dev)?.sample_iter(rng)),
             RandomVariable::Poisson { lambda } => Box::new(Poisson::new(*lambda)?.sample_iter(rng)),
-            RandomVariable::Exp { lambda } => Box::new(Exp::new(*lambda)?.sample_iter(rng)),
+            RandomVariable::Exp { lambda, mean, scale } => {
+                let mean = *mean;
+                let scale = *scale;
+                Box::new(Exp::new(*lambda)?.sample_iter(rng).map(move |s| s * scale + mean))
+            }
         };
         Ok(iter)
     }
@@ -48,7 +52,7 @@ where
 
 // ====== Config ======
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum IncomingJobConfig {
     OneBatch {
@@ -61,7 +65,7 @@ pub enum IncomingJobConfig {
     },
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct JobSpec {
     length: RandomVariable<f64>,
     /// SLO budget
@@ -69,12 +73,12 @@ pub struct JobSpec {
     budget: Option<f64>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum RandomVariable<T> {
     Uniform { low: T, high: T },
     Normal { mean: T, std_dev: T },
     LogNormal { mean: T, std_dev: T },
     Poisson { lambda: T },
-    Exp { lambda: T },
+    Exp { lambda: T, mean: T, scale: T },
 }
