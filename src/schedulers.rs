@@ -31,7 +31,7 @@ impl FIFO {
         assert!(!self.running);
         self.running = true;
         let batch = pending_jobs.drain(..batch_size).collect();
-        SystemState::batch(self.now, batch)
+        SystemState::batch(0, self.now, batch)
     }
 }
 

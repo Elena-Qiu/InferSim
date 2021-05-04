@@ -24,8 +24,8 @@ impl SystemState {
     pub fn incoming_jobs(jobs: Vec<IncomingJob>) -> Self {
         Self::IncomingJobs { jobs }
     }
-    pub fn batch(now: f64, jobs: Vec<Job>) -> Self {
-        Self::BatchDone(Batch { jobs, started: now })
+    pub fn batch(id: usize, now: f64, jobs: Vec<Job>) -> Self {
+        Self::BatchDone(Batch { id, jobs, started: now })
     }
     pub fn wait() -> Self {
         Self::Idle

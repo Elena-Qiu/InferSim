@@ -72,6 +72,7 @@ impl fmt::Display for Job {
 
 #[derive(Debug, Clone)]
 pub struct Batch {
+    pub id: usize,
     pub jobs: Vec<Job>,
     pub started: f64,
 }

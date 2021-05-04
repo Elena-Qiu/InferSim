@@ -26,6 +26,8 @@ pub fn render_chrome_trace<'a, E>(events: E) -> Result<()>
 where
     E: IntoIterator<Item = &'a (Event<SystemState>, SystemState)>,
 {
+    const BATCH_PID: usize = 100;
+
     let path: PathBuf = config().get("output_file")?;
     let mut file = BufWriter::new(File::create(path)?);
     file.write_all(b"{\"traceEvents\":[\n")?;
@@ -49,7 +51,25 @@ where
         match evt.state() {
             SystemState::IncomingJobs { jobs } => {
                 for job in jobs.iter() {
-                    // queuing time are drawn as duration on thread 0
+                    // infer time are drawn as duration on pid 1
+                    event_line(
+                        &mut file,
+                        json!({
+                            "name": format!("Job {}", job.id),
+                            "ph": "X",
+                            "cat": "exec.exact",
+                            "ts": evt.time(),
+                            "dur": job.length,
+                            "id": job.id,
+                            "tid": job.id,
+                            "pid": 1,
+                            "args": {
+                                "job_id": job.id,
+                                "job_len": job.length,
+                            }
+                        }),
+                    )?;
+                    // queuing time are drawn as duration on pid 0
                     event_line(
                         &mut file,
                         json!({
@@ -126,7 +146,7 @@ where
                         "ts": batch.started,
                         "dur": evt.time() - batch.started,
                         "tid": 0,
-                        "pid": 1,
+                        "pid": BATCH_PID + batch.id,
                         "args": {
                             "batch_size": batch.jobs.len(),
                         }
@@ -177,7 +197,7 @@ where
                             "ts": batch.started + 0.01,
                             "id": job.id,
                             "tid": idx,
-                            "pid": 1,
+                            "pid": BATCH_PID + batch.id,
                             "args": {
                                 "job_id": job.id,
                             }
@@ -194,7 +214,7 @@ where
                             "dur": job.length,
                             "id": job.id,
                             "tid": idx,
-                            "pid": 1,
+                            "pid": BATCH_PID + batch.id,
                             "args": {
                                 "job_id": job.id,
                             }
@@ -246,9 +266,31 @@ where
         json!({
             "name": "process_name",
             "ph": "M",
+            "pid": 1,
+            "args": {
+                "name": "Pending Jobs (Exact Inference Time)"
+            }
+        }),
+    )?;
+    event_line(
+        &mut file,
+        json!({
+            "name": "process_sort_index",
+            "ph": "M",
+            "pid": 1,
+            "args": {
+                "sort_index": 1
+            }
+        }),
+    )?;
+    event_line(
+        &mut file,
+        json!({
+            "name": "process_name",
+            "ph": "M",
             "pid": 0,
             "args": {
-                "name": "Pending Jobs"
+                "name": "Pending Jobs (Waiting Time)"
             }
         }),
     )?;
@@ -268,9 +310,9 @@ where
         json!({
             "name": "process_sort_index",
             "ph": "M",
-            "pid": 1,
+            "pid": BATCH_PID,
             "args": {
-                "sort_index": 1
+                "sort_index": 100
             }
         }),
     )?;
@@ -279,7 +321,7 @@ where
         json!({
             "name": "process_name",
             "ph": "M",
-            "pid": 1,
+            "pid": BATCH_PID,
             "args": {
                 "name": "Batch 0"
             }
