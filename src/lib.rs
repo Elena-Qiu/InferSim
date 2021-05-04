@@ -106,10 +106,10 @@ pub fn run_sim() -> Result<()> {
     let mut rng: SipRng = Seeder::from(cfg.seed.as_deref().unwrap_or("stripy zebra")).make_rng();
 
     // setup incoming jobs
-    let incoming_jobs = incoming::from_config(&mut rng, &cfg.incoming)?;
+    let incoming_jobs = incoming::from_config(rng.clone(), &cfg.incoming)?;
 
     // setup scheduler
-    let scheduler = schedulers::FIFO::new(2);
+    let scheduler = schedulers::Random::new(rng.clone(), 2);
 
     // build simulator
     let mut sim = build_simulation(scheduler, incoming_jobs);
