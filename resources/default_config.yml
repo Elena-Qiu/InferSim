@@ -1,0 +1,40 @@
+---
+seed: stripy zebra
+output_file: /dev/shm/aetf/workspace/rand.timeline.json
+
+logging:
+  filter:
+    directives: TRACE
+    from_env: RUST_LOG
+  outputs:
+    - enabled: true
+      target:
+        type: term
+        name: stderr
+        auto_switch: true
+      span_events:
+        - Enter
+    - filter:
+        from_env: false
+        directives: TRACE
+      enabled: false
+      span_events:
+        - Enter
+      target:
+        name: infersim.log
+        directory: /tmp
+        type: file
+
+incoming:
+  delay: 0.0
+  spec:
+    length:
+      type: Exp
+      mean: 10.0
+      lambda: 1.5
+      scale: 18.0
+      std_dev: 25.0
+  n_jobs: 500
+  type: OneBatch
+
+presets:

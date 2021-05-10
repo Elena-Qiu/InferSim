@@ -23,25 +23,15 @@ pub struct Config {
 impl Cmd for Config {
     fn run(self) -> Result<()> {
         if self.presets {
-            let presets: toml::Value = config().get("presets")?;
-            println!(
-                "{}",
-                toml::to_string_pretty(&presets).expect("toml can't format its own value!")
-            );
+            let presets: serde_yaml::Value = config().get("presets")?;
+            serde_yaml::to_writer(std::io::stdout(), &presets).expect("serde_yaml can't format its own value!");
         } else {
-            let mut config: toml::Value = config().fetch()?;
+            let mut config: serde_yaml::Mapping = config().fetch()?;
 
             // strip presets table from the output
-            {
-                let table = config
-                    .as_table_mut()
-                    .ok_or_else(|| Error::invalid_config("expect a table as the top level"))?;
-                table.remove("presets");
-            }
-            println!(
-                "{}",
-                toml::to_string_pretty(&config).expect("toml can't format its own value!")
-            );
+            config.remove(&"presets".into());
+
+            serde_yaml::to_writer(std::io::stdout(), &config).expect("serde_yaml can't format its own value!");
         };
         Ok(())
     }

@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 
 use super::error::Result;
 
-static DEFAULT_CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/default_config.toml"));
+static DEFAULT_CONFIG: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/default_config.yml"));
 
 /// A new type to impl `config::Source`
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -39,7 +39,7 @@ impl AppConfig {
     pub fn setup(&mut self) -> Result<&mut Self> {
         // Merge with default config
         self.0
-            .merge(config::File::from_str(&DEFAULT_CONFIG, config::FileFormat::Toml))?;
+            .merge(config::File::from_str(&DEFAULT_CONFIG, config::FileFormat::Yaml))?;
 
         // Merge settings with env variables
         self.0.merge(Environment::with_prefix("INFERSIM"))?;
