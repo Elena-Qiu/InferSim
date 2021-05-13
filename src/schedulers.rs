@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::collections::VecDeque;
 
 use rand::{seq::SliceRandom, Rng};
+use rand_seeder::{Seeder, SipRng};
 
 use crate::simulator::{Scheduler, SystemState};
 use crate::utils::prelude::*;
@@ -149,13 +150,26 @@ impl<T: Rng> Scheduler for Random<T> {
 pub fn from_config(rng: impl Rng + 'static, cfg: &SchedulerConfig) -> Result<Box<dyn Scheduler>> {
     Ok(match cfg {
         SchedulerConfig::FIFO { batch_size } => Box::new(FIFO::new(*batch_size)),
-        SchedulerConfig::Random { batch_size } => Box::new(Random::new(rng, *batch_size)),
+        SchedulerConfig::Random { batch_size, seed } => {
+            if let Some(seed) = seed {
+                let rng: SipRng = Seeder::from(seed).make_rng();
+                Box::new(Random::new(rng, *batch_size))
+            } else {
+                Box::new(Random::new(rng, *batch_size))
+            }
+        }
     })
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type")]
 pub enum SchedulerConfig {
-    FIFO { batch_size: usize },
-    Random { batch_size: usize },
+    FIFO {
+        batch_size: usize,
+    },
+    Random {
+        batch_size: usize,
+        /// Optional seed. If none, will use the same random generator as the one for incoming jobs
+        seed: Option<String>,
+    },
 }
