@@ -37,4 +37,8 @@ incoming:
   n_jobs: 500
   type: OneBatch
 
+scheduler:
+  type: FIFO
+  batch_size: 10
+
 presets:

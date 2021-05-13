@@ -98,6 +98,7 @@ impl Batch {
 struct SimConfig {
     seed: Option<String>,
     incoming: incoming::IncomingJobConfig,
+    scheduler: schedulers::SchedulerConfig,
 }
 
 pub fn run_sim() -> Result<()> {
@@ -109,7 +110,7 @@ pub fn run_sim() -> Result<()> {
     let incoming_jobs = incoming::from_config(rng.clone(), &cfg.incoming)?;
 
     // setup scheduler
-    let scheduler = schedulers::Random::new(rng, 2);
+    let scheduler = schedulers::from_config(rng, &cfg.scheduler)?;
 
     // build simulator
     let mut sim = build_simulation(scheduler, incoming_jobs);

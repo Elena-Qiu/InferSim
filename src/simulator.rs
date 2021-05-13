@@ -82,6 +82,23 @@ pub trait Scheduler {
     fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState;
 }
 
+impl Scheduler for Box<dyn Scheduler> {
+    #[inline]
+    fn on_tick(&mut self, now: f64) {
+        (**self).on_tick(now)
+    }
+
+    #[inline]
+    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
+        (**self).on_new_jobs(pending_jobs)
+    }
+
+    #[inline]
+    fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState {
+        (**self).on_batch_done(batch, pending_jobs)
+    }
+}
+
 /// The scheduler process will take incoming jobs and create batches from them
 fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<SystemState>> {
     Box::new(move |mut ctx: SimContext<SystemState>| {

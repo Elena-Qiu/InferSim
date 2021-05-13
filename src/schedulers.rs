@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use rand::{seq::SliceRandom, Rng};
 
 use crate::simulator::{Scheduler, SystemState};
-use crate::utils::logging::prelude::*;
+use crate::utils::prelude::*;
 use crate::{Batch, Job};
 
 /// The simplest FIFO scheduler, with a fixed batch size of 5
@@ -144,4 +144,18 @@ impl<T: Rng> Scheduler for Random<T> {
         self.running = false;
         self.next_batch(pending_jobs)
     }
+}
+
+pub fn from_config(rng: impl Rng + 'static, cfg: &SchedulerConfig) -> Result<Box<dyn Scheduler>> {
+    Ok(match cfg {
+        SchedulerConfig::FIFO { batch_size } => Box::new(FIFO::new(*batch_size)),
+        SchedulerConfig::Random { batch_size } => Box::new(Random::new(rng, *batch_size)),
+    })
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum SchedulerConfig {
+    FIFO { batch_size: usize },
+    Random { batch_size: usize },
 }
