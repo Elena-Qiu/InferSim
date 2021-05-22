@@ -108,8 +108,9 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Syste
             let curr = ctx.into_state();
             // handle past due jobs
             pending_jobs = {
-                let (past_due, pending_jobs): (VecDeque<_>, _) =
-                    pending_jobs.into_iter().partition(|j| j.missed_deadline(time));
+                let (past_due, pending_jobs): (VecDeque<_>, _) = pending_jobs
+                    .into_iter()
+                    .partition(|j| j.missed_deadline(time));
                 if !past_due.is_empty() {
                     ctx = yield SystemState::JobsPastDue(past_due.into());
                     // the time should be the same

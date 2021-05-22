@@ -27,17 +27,20 @@ where
 {
     #[inline]
     fn register_callsite(&self, metadata: &'static Metadata<'static>) -> Interest {
-        let res = self.inners.iter().try_fold(Interest::always(), |acc, layer| {
-            if acc.is_never() || acc.is_sometimes() {
-                // short circuit logic if previous layer has disabled the callsite,
-                // or it returns "sometimes", in which case we return that to ensure
-                // filters are reevaluated.
-                ControlFlow::Break(acc)
-            } else {
-                // let the next layer to weight in
-                ControlFlow::Continue(layer.register_callsite(metadata))
-            }
-        });
+        let res = self
+            .inners
+            .iter()
+            .try_fold(Interest::always(), |acc, layer| {
+                if acc.is_never() || acc.is_sometimes() {
+                    // short circuit logic if previous layer has disabled the callsite,
+                    // or it returns "sometimes", in which case we return that to ensure
+                    // filters are reevaluated.
+                    ControlFlow::Break(acc)
+                } else {
+                    // let the next layer to weight in
+                    ControlFlow::Continue(layer.register_callsite(metadata))
+                }
+            });
         match res {
             ControlFlow::Break(res) => res,
             ControlFlow::Continue(res) => res,
@@ -46,7 +49,9 @@ where
 
     #[inline]
     fn enabled(&self, metadata: &Metadata<'_>, ctx: Context<'_, S>) -> bool {
-        self.inners.iter().all(|layer| layer.enabled(metadata, ctx.clone()))
+        self.inners
+            .iter()
+            .all(|layer| layer.enabled(metadata, ctx.clone()))
     }
 
     #[inline]
@@ -144,7 +149,9 @@ where
     where
         T: IntoIterator<Item = L>,
     {
-        let iter = iter.into_iter().map(|l| -> BoxedLayer<S> { Box::new(l) });
+        let iter = iter
+            .into_iter()
+            .map(|l| -> BoxedLayer<S> { Box::new(l) });
         self.inners.extend(iter);
         callsite::rebuild_interest_cache();
     }

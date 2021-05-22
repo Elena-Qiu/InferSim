@@ -14,7 +14,9 @@ fn test_cli() {
 fn test_version() {
     let expected_version = "infersim 0.1.0\n";
     let mut cmd = Command::cargo_bin("infersim").expect("Calling binary failed");
-    cmd.arg("--version").assert().stdout(expected_version);
+    cmd.arg("--version")
+        .assert()
+        .stdout(expected_version);
 }
 
 #[test]

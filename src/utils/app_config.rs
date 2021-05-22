@@ -42,7 +42,8 @@ impl AppConfig {
             .merge(config::File::from_str(&DEFAULT_CONFIG, config::FileFormat::Yaml))?;
 
         // Merge settings with env variables
-        self.0.merge(Environment::with_prefix("INFERSIM"))?;
+        self.0
+            .merge(Environment::with_prefix("INFERSIM"))?;
 
         Ok(self)
     }

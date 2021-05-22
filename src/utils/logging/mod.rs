@@ -76,7 +76,10 @@ impl GlobalLoggingContext {
         }
 
         // prepare span events
-        let span_events = output.span_events.iter().fold(FmtSpan::NONE, |f, e| f | (*e).into());
+        let span_events = output
+            .span_events
+            .iter()
+            .fold(FmtSpan::NONE, |f, e| f | (*e).into());
 
         // prepare a writer as specified in the config
         let (writer, guard) = output.target.to_writer(produces_output);
@@ -84,7 +87,12 @@ impl GlobalLoggingContext {
 
         // combine a filtering and a formatting layer
         let mut layers = combined::Layer::empty();
-        layers.add(output.filter.with_default(global_filter).to_env_filter());
+        layers.add(
+            output
+                .filter
+                .with_default(global_filter)
+                .to_env_filter(),
+        );
         layers.add(
             FmtLayer::default()
                 .with_ansi(output.target.supports_color())
@@ -132,8 +140,14 @@ impl FilterConfig {
 
     pub fn with_default(&self, default: &FilterConfig) -> FilterConfig {
         Self {
-            directives: self.directives.clone().or_else(|| default.directives.clone()),
-            from_env: self.directives.clone().or_else(|| default.directives.clone()),
+            directives: self
+                .directives
+                .clone()
+                .or_else(|| default.directives.clone()),
+            from_env: self
+                .directives
+                .clone()
+                .or_else(|| default.directives.clone()),
         }
     }
 }

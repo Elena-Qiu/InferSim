@@ -43,7 +43,11 @@ where
             RandomVariable::Exp { lambda, mean, scale } => {
                 let mean = *mean;
                 let scale = *scale;
-                Box::new(Exp::new(*lambda)?.sample_iter(rng).map(move |s| s * scale + mean))
+                Box::new(
+                    Exp::new(*lambda)?
+                        .sample_iter(rng)
+                        .map(move |s| s * scale + mean),
+                )
             }
         };
         Ok(iter)
