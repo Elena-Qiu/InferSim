@@ -1,92 +1,95 @@
-use anyhow::anyhow;
-use std::backtrace::Backtrace;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    InvalidConfig(anyhow::Error),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Logging(anyhow::Error),
-    #[error(transparent)]
-    Others(#[from] anyhow::Error),
-    #[error("lock poisoned: {msg}")]
-    Poisoned { msg: String, backtrace: Backtrace },
-}
+pub use error_kind::Kind;
+use error_kind::WithKind;
 
-/// A type alias that forces the usage of the custom error type.
-pub type Result<T> = std::result::Result<T, Error>;
+/// A type alias that defaults to the custom error type.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-impl Error {
-    pub fn adhoc(msg: &'static str) -> Self {
-        Self::Others(anyhow!(msg))
+mod error_kind {
+    //! A generic error kind implementation supporting multiple error types
+    //! See: https://github.com/dtolnay/anyhow/issues/75#issuecomment-602796794
+
+    /// Custom error type needs to implement `From<WithKind<CustomErrorKind>>`
+    pub struct WithKind<K> {
+        pub kind: K,
+        pub source: anyhow::Error,
     }
 
-    pub fn invalid_config(msg: &'static str) -> Self {
-        Self::InvalidConfig(anyhow!(msg))
+    /// Attach a `kind` method to result
+    pub trait Kind {
+        type Ok;
+        fn kind<K>(self, kind: K) -> Result<Self::Ok, WithKind<K>>;
     }
-}
 
-// ====== Logging ======
-
-impl From<tracing::subscriber::SetGlobalDefaultError> for Error {
-    fn from(err: tracing::subscriber::SetGlobalDefaultError) -> Self {
-        Self::Logging(anyhow::Error::from(err))
-    }
-}
-
-impl From<tracing_subscriber::util::TryInitError> for Error {
-    fn from(err: tracing_subscriber::util::TryInitError) -> Self {
-        Self::Logging(anyhow::Error::from(err))
-    }
-}
-
-impl From<tracing_subscriber::reload::Error> for Error {
-    fn from(err: tracing_subscriber::reload::Error) -> Self {
-        Self::Logging(anyhow::Error::from(err))
-    }
-}
-
-impl<T> From<std::sync::PoisonError<T>> for Error {
-    fn from(err: std::sync::PoisonError<T>) -> Self {
-        Self::Poisoned {
-            msg: err.to_string(),
-            backtrace: Backtrace::capture(),
+    impl<T, E> Kind for Result<T, E>
+    where
+        E: Into<anyhow::Error>,
+    {
+        type Ok = T;
+        fn kind<K>(self, kind: K) -> Result<T, WithKind<K>> {
+            self.map_err(|e| WithKind { kind, source: e.into() })
         }
     }
 }
 
+#[derive(Error, Debug, Clone, Eq, PartialEq)]
+pub enum ErrorKind {
+    #[error("invalid config")]
+    InvalidConfig,
+    #[error("logging")]
+    Logging,
+    #[error("chrome tracing")]
+    ChromeTracing,
+    #[error("{0}")]
+    Others(String),
+}
+
+#[derive(Error, Debug)]
+#[error("{kind}")]
+pub struct Error {
+    kind: ErrorKind,
+    source: anyhow::Error,
+}
+
+impl Error {
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
+}
+
+impl From<WithKind<ErrorKind>> for Error {
+    fn from(w: WithKind<ErrorKind>) -> Self {
+        Error {
+            kind: w.kind,
+            source: w.source,
+        }
+    }
+}
+
+// ====== Pre-defined Conversions ======
+macro_rules! impl_from_err {
+    ($err:ty, $kind:ident) => {
+        impl From<$err> for Error {
+            fn from(err: $err) -> Self {
+                WithKind {
+                    kind: ErrorKind::$kind,
+                    source: err.into(),
+                }
+                .into()
+            }
+        }
+    };
+}
+
+// ====== Logging ======
+
+impl_from_err!(tracing::subscriber::SetGlobalDefaultError, Logging);
+impl_from_err!(tracing_subscriber::util::TryInitError, Logging);
+impl_from_err!(tracing_subscriber::reload::Error, Logging);
+
 // ====== Config ======
-
-impl From<config::ConfigError> for Error {
-    fn from(err: config::ConfigError) -> Self {
-        Self::InvalidConfig(anyhow::Error::from(err))
-    }
-}
-
-impl From<rand_distr::NormalError> for Error {
-    fn from(err: rand_distr::NormalError) -> Self {
-        Self::InvalidConfig(anyhow::Error::from(err))
-    }
-}
-
-impl From<rand_distr::PoissonError> for Error {
-    fn from(err: rand_distr::PoissonError) -> Self {
-        Self::InvalidConfig(anyhow::Error::from(err))
-    }
-}
-
-impl From<rand_distr::ExpError> for Error {
-    fn from(err: rand_distr::ExpError) -> Self {
-        Self::InvalidConfig(anyhow::Error::from(err))
-    }
-}
-
-// ====== Chrome Trace output ======
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Self {
-        Self::Others(anyhow::Error::from(err))
-    }
-}
+impl_from_err!(config::ConfigError, InvalidConfig);
+impl_from_err!(rand_distr::NormalError, InvalidConfig);
+impl_from_err!(rand_distr::PoissonError, InvalidConfig);
+impl_from_err!(rand_distr::ExpError, InvalidConfig);

@@ -16,9 +16,9 @@ fn event_line(writer: impl io::Write, val: serde_json::Value) -> Result<()> {
 }
 
 fn event_line_with_ending(mut writer: impl io::Write, val: serde_json::Value, ending: bool) -> Result<()> {
-    serde_json::to_writer(&mut writer, &val)?;
+    serde_json::to_writer(&mut writer, &val).kind(ErrorKind::ChromeTracing)?;
     if ending {
-        writer.write_all(b",\n")?;
+        writer.write_all(b",\n").kind(ErrorKind::ChromeTracing)?;
     }
     Ok(())
 }
@@ -30,8 +30,8 @@ where
     const BATCH_PID: usize = 100;
 
     let path: PathBuf = config().get("output_file")?;
-    let mut file = BufWriter::new(File::create(path)?);
-    file.write_all(b"{\"traceEvents\":[\n")?;
+    let mut file = BufWriter::new(File::create(path).kind(ErrorKind::ChromeTracing)?);
+    file.write_all(b"{\"traceEvents\":[\n").kind(ErrorKind::ChromeTracing)?;
 
     let mut past_due = 0;
     event_line(
@@ -330,10 +330,10 @@ where
         }),
         false,
     )?;
-    file.write_all(b"\n],\"config\":")?;
+    file.write_all(b"\n],\"config\":").kind(ErrorKind::ChromeTracing)?;
 
     let cfg: SimConfig = config().fetch()?;
-    serde_json::to_writer(&mut file, &cfg)?;
-    file.write_all(b"\n}")?;
+    serde_json::to_writer(&mut file, &cfg).kind(ErrorKind::ChromeTracing)?;
+    file.write_all(b"\n}").kind(ErrorKind::ChromeTracing)?;
     Ok(())
 }
