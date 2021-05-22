@@ -3,8 +3,8 @@ use std::fmt;
 
 use desim::{Effect, SimContext, SimGen, SimState, Simulation};
 
+use crate::types::{Batch, IncomingJob, Job, Time};
 use crate::utils::logging::prelude::*;
-use crate::{Batch, IncomingJob, Job};
 
 /// The simulation state
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ impl SystemState {
     pub fn incoming_jobs(jobs: Vec<IncomingJob>) -> Self {
         Self::IncomingJobs { jobs }
     }
-    pub fn batch(id: usize, now: f64, jobs: Vec<Job>) -> Self {
+    pub fn batch(id: usize, now: Time, jobs: Vec<Job>) -> Self {
         Self::BatchDone(Batch { id, jobs, started: now })
     }
     pub fn wait() -> Self {
@@ -61,7 +61,7 @@ impl SimState for SystemState {
                 warn!(?self, "Some jobs are past due");
                 Effect::Trace
             }
-            SystemState::BatchDone(batch) => Effect::TimeOut(batch.latency()),
+            SystemState::BatchDone(batch) => Effect::TimeOut(batch.latency().0),
             SystemState::Idle => Effect::Wait,
         }
     }
@@ -77,14 +77,14 @@ impl SimState for SystemState {
 
 /// Scheduler mostly just react on events
 pub trait Scheduler {
-    fn on_tick(&mut self, now: f64);
+    fn on_tick(&mut self, now: Time);
     fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState;
     fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState;
 }
 
 impl Scheduler for Box<dyn Scheduler> {
     #[inline]
-    fn on_tick(&mut self, now: f64) {
+    fn on_tick(&mut self, now: Time) {
         (**self).on_tick(now)
     }
 
@@ -104,7 +104,7 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Syste
     Box::new(move |mut ctx: SimContext<SystemState>| {
         let mut pending_jobs: VecDeque<Job> = Default::default();
         loop {
-            let time = ctx.time();
+            let time = Time(ctx.time());
             let curr = ctx.into_state();
             // handle past due jobs
             pending_jobs = {
@@ -112,7 +112,8 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Syste
                     pending_jobs.into_iter().partition(|j| j.missed_deadline(time));
                 if !past_due.is_empty() {
                     ctx = yield SystemState::JobsPastDue(past_due.into());
-                    assert!((time - ctx.time()).abs() < f64::EPSILON);
+                    // the time should be the same
+                    assert!((time - Time(ctx.time())).abs() < f64::EPSILON);
                 }
                 pending_jobs
             };

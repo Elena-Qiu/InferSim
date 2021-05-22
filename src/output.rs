@@ -7,6 +7,7 @@ use desim::Event;
 use serde_json::json;
 
 use crate::simulator::SystemState;
+use crate::types::{Duration, Time};
 use crate::utils::prelude::*;
 use crate::SimConfig;
 
@@ -48,6 +49,7 @@ where
     )?;
 
     for (evt, _) in events.into_iter() {
+        let time = Time(evt.time());
         match evt.state() {
             SystemState::IncomingJobs { jobs } => {
                 for job in jobs.iter() {
@@ -58,7 +60,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "X",
                             "cat": "exec.exact",
-                            "ts": evt.time(),
+                            "ts": time,
                             "dur": job.length,
                             "id": job.id,
                             "tid": job.id,
@@ -76,7 +78,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "B",
                             "cat": "queuing",
-                            "ts": evt.time(),
+                            "ts": time,
                             "id": job.id,
                             "tid": job.id,
                             "pid": 0,
@@ -93,7 +95,7 @@ where
                                 "name": format!("Job {} Deadline", job.id),
                                 "ph": "s",
                                 "cat": "deadline.flow",
-                                "ts": evt.time(),
+                                "ts": time,
                                 "id": job.id,
                                 "tid": job.id,
                                 "pid": 0,
@@ -108,7 +110,7 @@ where
                                 "name": format!("Job {} Deadline", job.id),
                                 "ph": "f",
                                 "cat": "deadline.flow",
-                                "ts": evt.time() + budget,
+                                "ts": time + budget,
                                 "id": job.id,
                                 "tid": job.id,
                                 "pid": 0,
@@ -123,7 +125,7 @@ where
                                 "name": format!("Job {} Deadline", job.id),
                                 "ph": "I",
                                 "cat": "deadline",
-                                "ts": evt.time() + budget,
+                                "ts": time + budget,
                                 "id": job.id,
                                 "tid": job.id,
                                 "pid": 0,
@@ -144,7 +146,7 @@ where
                         "ph": "X",
                         "cat": "exec.batch",
                         "ts": batch.started,
-                        "dur": evt.time() - batch.started,
+                        "dur": time - batch.started,
                         "tid": 0,
                         "pid": BATCH_PID + batch.id,
                         "args": {
@@ -194,7 +196,7 @@ where
                             "ph": "f",
                             "bp": "e",
                             "cat": "scheduling",
-                            "ts": batch.started + 0.01,
+                            "ts": batch.started + Duration(0.01),
                             "id": job.id,
                             "tid": idx,
                             "pid": BATCH_PID + batch.id,

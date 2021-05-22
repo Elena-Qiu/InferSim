@@ -1,8 +1,8 @@
 use rand::Rng;
 use rand_distr::{Distribution, Exp, LogNormal, Normal, Poisson, StandardNormal, Uniform};
 
+use crate::types::{Duration, IncomingJob};
 use crate::utils::prelude::*;
-use crate::IncomingJob;
 
 pub fn from_config<'a>(
     rng: impl Rng + 'a,
@@ -16,8 +16,8 @@ pub fn from_config<'a>(
                 .zip(0..*n_jobs)
                 .map(move |(length, id)| IncomingJob {
                     id,
-                    length,
-                    budget: spec.budget,
+                    length: Duration(length),
+                    budget: spec.budget.map(Duration),
                 });
             std::iter::once((*delay, jobs))
         }

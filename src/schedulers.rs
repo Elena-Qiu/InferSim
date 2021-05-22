@@ -5,15 +5,15 @@ use rand::{seq::SliceRandom, Rng};
 use rand_seeder::{Seeder, SipRng};
 
 use crate::simulator::{Scheduler, SystemState};
+use crate::types::{Batch, Job, Time};
 use crate::utils::prelude::*;
-use crate::{Batch, Job};
 
 /// The simplest FIFO scheduler, with a fixed batch size of 5
 #[derive(Debug)]
 pub struct FIFO {
     batch_size: usize,
     running: bool,
-    now: f64,
+    now: Time,
 }
 
 impl FIFO {
@@ -21,7 +21,7 @@ impl FIFO {
         FIFO {
             batch_size,
             running: false,
-            now: 0.0,
+            now: Time(0.0),
         }
     }
 
@@ -39,7 +39,7 @@ impl FIFO {
 }
 
 impl Scheduler for FIFO {
-    fn on_tick(&mut self, now: f64) {
+    fn on_tick(&mut self, now: Time) {
         self.now = now;
     }
 
@@ -78,7 +78,7 @@ impl Scheduler for FIFO {
 pub struct Random<T> {
     batch_size: usize,
     running: bool,
-    now: f64,
+    now: Time,
     rng: T,
 }
 
@@ -87,7 +87,7 @@ impl<T: Rng> Random<T> {
         Random {
             batch_size,
             running: false,
-            now: 0.0,
+            now: Time(0.0),
             rng,
         }
     }
@@ -112,7 +112,7 @@ impl<T: Rng> Random<T> {
 }
 
 impl<T: Rng> Scheduler for Random<T> {
-    fn on_tick(&mut self, now: f64) {
+    fn on_tick(&mut self, now: Time) {
         self.now = now;
     }
 
