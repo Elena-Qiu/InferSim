@@ -1,6 +1,6 @@
 ---
 seed: stripy zebra
-output_file: /dev/shm/aetf/workspace/rand.timeline.json
+output_dir: /dev/shm/aetf/workspace/{preset}
 
 logging:
   filter:

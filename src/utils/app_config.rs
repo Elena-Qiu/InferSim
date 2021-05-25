@@ -49,8 +49,8 @@ impl AppConfig {
     }
 
     /// Load config from a file
-    pub fn use_file(&mut self, path: &Path) -> Result<&mut Self> {
-        self.0.merge(config::File::from(path))?;
+    pub fn use_file(&mut self, path: impl AsRef<Path>) -> Result<&mut Self, config::ConfigError> {
+        self.0.merge(config::File::from(path.as_ref()))?;
         Ok(self)
     }
 
@@ -59,7 +59,13 @@ impl AppConfig {
         // load the preset
         let preset: Preset = self.get(format!("presets.{}", name))?;
         self.0.merge(preset)?;
+        self.0.set("preset", name)?;
         Ok(self)
+    }
+
+    pub fn set_once(&mut self, key: impl AsRef<str>, val: impl Into<config::Value>) -> Result<()> {
+        self.0.set_once(key.as_ref(), val.into())?;
+        Ok(())
     }
 
     /// Get a single value and deserialize to the given type

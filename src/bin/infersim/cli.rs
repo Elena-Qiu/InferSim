@@ -1,5 +1,6 @@
 use std::fmt;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use structopt::clap::AppSettings;
 use structopt::StructOpt;
@@ -18,7 +19,7 @@ use crate::utils::prelude::*;
     usage = "infersim [OPTIONS] <SUBCOMMAND> [preset]"
 )]
 pub struct CLI {
-    /// Set a custom config file
+    /// Set a custom config file, defaults to './config.yml'
     #[structopt(short, long, global = true, value_name = "FILE", parse(from_os_str))]
     config: Option<PathBuf>,
     /// The config preset to load, if missing, the global default is used
@@ -80,13 +81,30 @@ pub fn execute(logging: &mut GlobalLoggingContext) -> Result<()> {
     // load config file
     if let Some(path) = cli.config {
         config_mut().use_file(&path)?;
+    } else {
+        // automatically use config.yml if there's one
+        let path = Path::new("config.yml");
+        if path.exists() {
+            info!(?path, "Using default config file");
+            config_mut().use_file(path)?;
+        }
     }
     // load preset
-    if let Some(preset) = cli.preset {
-        config_mut().use_preset(&preset)?;
-    }
+    let preset = if let Some(preset) = &cli.preset {
+        config_mut().use_preset(preset)?;
+        preset
+    } else {
+        "default"
+    };
     // apply settings from config
     logging.reconfigure(cli.cmd.produces_output())?;
+    // render preset name in output_dir
+    {
+        let mut cfg = config_mut();
+        let output_dir: String = cfg.get("output_dir")?;
+        let output_dir = output_dir.replace("{preset}", preset);
+        cfg.set_once("output_dir", output_dir)?;
+    }
 
     cli.cmd.run()
 }

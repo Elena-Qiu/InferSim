@@ -1,11 +1,11 @@
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
-use std::path::PathBuf;
 
 use desim::Event;
 use serde_json::json;
 
+use crate::config::AppConfigExt as _;
 use crate::simulator::SystemState;
 use crate::types::{Duration, Time};
 use crate::utils::prelude::*;
@@ -31,7 +31,7 @@ where
 {
     const BATCH_PID: usize = 100;
 
-    let path: PathBuf = config().get("output_file")?;
+    let path = config().output_dir()?.file("timeline.json")?;
     let mut file = BufWriter::new(File::create(path).kind(ErrorKind::ChromeTracing)?);
     file.write_all(b"{\"traceEvents\":[\n")
         .kind(ErrorKind::ChromeTracing)?;

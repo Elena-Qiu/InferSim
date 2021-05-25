@@ -6,6 +6,7 @@ use rand_seeder::{Seeder, SipRng};
 use crate::simulator::build_simulation;
 use crate::utils::prelude::*;
 
+mod config;
 mod incoming;
 mod output;
 mod schedulers;
