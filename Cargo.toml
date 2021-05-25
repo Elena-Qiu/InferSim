@@ -49,6 +49,8 @@ serde_yaml = "0.8.17"
 # for chrome tracing
 serde_json = "1.0.64"
 derive_more = "0.99.13"
+gen-iter = "0.2.0"
+itertools = "0.10.0"
 
 [features]
 default = []

@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Add, Deref, Sub};
+use std::ops::{Add, AddAssign, Deref, Sub};
 
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,12 @@ impl Add<Duration> for Time {
     }
 }
 
+impl AddAssign<Duration> for Time {
+    fn add_assign(&mut self, rhs: Duration) {
+        self.0 += rhs.0;
+    }
+}
+
 impl Sub for Time {
     type Output = Duration;
 
@@ -37,7 +43,7 @@ impl Sub for Time {
 }
 
 /// Incoming job, not yet accepted by the system
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IncomingJob {
     /// Job ID
     pub id: usize,
@@ -68,7 +74,7 @@ impl IncomingJob {
 }
 
 /// A job admitted in the system
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Job {
     pub id: usize,
     pub admitted: Time,
@@ -92,7 +98,7 @@ impl fmt::Display for Job {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Batch {
     pub id: usize,
     pub jobs: Vec<Job>,

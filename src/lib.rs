@@ -1,4 +1,5 @@
 #![feature(generators, generator_trait, backtrace, control_flow_enum)]
+#![feature(total_cmp)]
 
 use desim::EndCondition;
 use rand_seeder::{Seeder, SipRng};
@@ -17,7 +18,7 @@ pub mod utils;
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct SimConfig {
     seed: Option<String>,
-    incoming: incoming::IncomingJobConfig,
+    incoming: incoming::IncomingConfig,
     scheduler: schedulers::SchedulerConfig,
 }
 

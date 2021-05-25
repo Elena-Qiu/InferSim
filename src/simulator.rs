@@ -3,6 +3,7 @@ use std::fmt;
 
 use desim::{Effect, SimContext, SimGen, SimState, Simulation};
 
+use crate::incoming::Incoming;
 use crate::types::{Batch, IncomingJob, Job, Time};
 use crate::utils::logging::prelude::*;
 
@@ -143,19 +144,16 @@ fn schedule_process(mut scheduler: impl Scheduler + 'static) -> Box<SimGen<Syste
     })
 }
 
-pub fn build_simulation<S, IJ, J>(scheduler: S, incoming_jobs: IJ) -> Simulation<SystemState>
+pub fn build_simulation<S>(scheduler: S, incoming_jobs: Incoming) -> Simulation<SystemState>
 where
     S: Scheduler + 'static,
-    IJ: IntoIterator<Item = (f64, J)>,
-    J: IntoIterator<Item = IncomingJob>,
 {
     let mut sim = Simulation::new();
     let p_schedule = sim.create_process(schedule_process(scheduler));
 
     // pump in incoming jobs as events ahead of time
-    for (time, batch) in incoming_jobs.into_iter() {
-        let jobs = batch.into_iter().collect();
-        sim.schedule_event(time, p_schedule, SystemState::incoming_jobs(jobs))
+    for (time, batch) in incoming_jobs.into_absolute().into_iter() {
+        sim.schedule_event(time.0, p_schedule, SystemState::incoming_jobs(batch))
     }
 
     sim
