@@ -41,6 +41,8 @@ pub enum ErrorKind {
     Logging,
     #[error("chrome tracing")]
     ChromeTracing,
+    #[error("job csv")]
+    JobsCsv,
     #[error("{0}")]
     Others(String),
 }

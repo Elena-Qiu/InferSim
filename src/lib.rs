@@ -39,7 +39,9 @@ pub fn run_sim() -> Result<()> {
     let _g = info_span!("sim_run").entered();
     sim = sim.run(EndCondition::NoEvents);
 
+    // outputs
     output::render_chrome_trace(sim.processed_events())?;
+    output::render_job_trace(sim.processed_events())?;
 
     Ok(())
 }
