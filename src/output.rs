@@ -349,7 +349,7 @@ where
 {
     let path = config().output_dir()?.file("jobs.csv")?;
     let mut file = BufWriter::new(File::create(path).kind(ErrorKind::JobsCsv)?);
-    file.write_all(b"JobId,Admitted,Started,Finished,State\n")
+    file.write_all(b"JobId,Length,Admitted,Started,Finished,State\n")
         .kind(ErrorKind::JobsCsv)?;
 
     for (evt, _) in events.into_iter() {
@@ -358,15 +358,21 @@ where
             SystemState::BatchDone(batch) => {
                 for job in batch.jobs.iter() {
                     file.write_all(
-                        format!("{},{},{},{},{}\n", job.id, job.admitted, batch.started, time, "done").as_bytes(),
+                        format!(
+                            "{},{},{},{},{},{}\n",
+                            job.id, job.length, job.admitted, batch.started, time, "done"
+                        )
+                        .as_bytes(),
                     )
                     .kind(ErrorKind::JobsCsv)?;
                 }
             }
             SystemState::JobsPastDue(jobs) => {
                 for job in jobs.iter() {
-                    file.write_all(format!("{},{},,{},{}\n", job.id, job.admitted, time, "past_due").as_bytes())
-                        .kind(ErrorKind::JobsCsv)?;
+                    file.write_all(
+                        format!("{},{},{},,{},{}\n", job.id, job.length, job.admitted, time, "past_due").as_bytes(),
+                    )
+                    .kind(ErrorKind::JobsCsv)?;
                 }
             }
             _ => (),
