@@ -2,18 +2,38 @@
 seed: stripy zebra
 output_dir: log/{preset}
 
+anchors:
+- &exp_spec
+  length:
+    type: "Exp"
+    lambda: 1.5
+    std_dev: 25.0
+    mean: 10.0
+    scale: 18.0
+
 presets:
+  test:
+    incoming:
+    - type: "OneBatch"
+      delay: 0.5
+      n_jobs: 10
+      spec: *exp_spec
+    - type: "Rate"
+      unit: 1.0
+      per: 2
+      spec: *exp_spec
+    scheduler:
+      type: "FIFO"
+      batch_size: 1
+    until:
+      Time: 2.6
+
   exp:
     incoming:
       type: "OneBatch"
       delay: 0.0
       n_jobs: 500
-      spec:
-        length:
-          type: "Exp"
-          lambda: 1.5
-          mean: 10.0
-          scale: 18.0
+      spec: *exp_spec
     scheduler:
       type: "FIFO"
       batch_size: 10
@@ -23,12 +43,6 @@ presets:
       type: "OneBatch"
       delay: 0.0
       n_jobs: 500
-      spec:
-        length:
-          mean: 10.0
-          std_dev: 25.0
-          scale: 18.0
-          type: Exp
-          lambda: 1.5
+      spec: *exp_spec
     scheduler:
       type: "Random"

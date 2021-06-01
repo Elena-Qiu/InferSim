@@ -229,14 +229,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "desim"
-version = "0.2.0"
-dependencies = [
- "rand",
- "rand_distr",
-]
-
-[[package]]
 name = "difference"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -320,7 +312,6 @@ dependencies = [
  "color-backtrace",
  "config",
  "derive_more",
- "desim",
  "gen-iter",
  "itertools",
  "lazy_static",

@@ -40,8 +40,9 @@ fn one_batch<'a>(
     base_id: usize,
     delay: Duration,
     n_jobs: usize,
-    spec: &'a JobSpec,
-) -> Result<Incoming> {
+    spec: &JobSpec,
+) -> Result<Incoming<'a>> {
+    let budget = spec.budget.map(Duration);
     let batch = spec
         .length
         .sample_iter(rng)?
@@ -49,7 +50,7 @@ fn one_batch<'a>(
         .map(move |(length, id)| IncomingJob {
             id: id + base_id,
             length: Duration(length),
-            budget: spec.budget.map(Duration),
+            budget,
         })
         .collect();
     Ok(Incoming(std::iter::once((delay, batch)).into_boxed()))
@@ -71,17 +72,36 @@ fn combined<'a>(models: impl IntoIterator<Item = Incoming<'a>>) -> Incoming<'a> 
     Incoming(models.into_boxed())
 }
 
+fn rate<'a>(rng: impl Rng + 'a, base_id: usize, per: usize, unit: Duration, spec: &JobSpec) -> Result<Incoming<'a>> {
+    let budget = spec.budget.map(Duration);
+    let mut it = spec
+        .length
+        .sample_iter(rng)?
+        .zip(base_id..)
+        .map(move |(length, id)| IncomingJob {
+            id,
+            length: Duration(length),
+            budget,
+        });
+    let it = std::iter::repeat_with(move || {
+        let batch = (&mut it).take(per).collect_vec();
+        (unit, batch)
+    })
+    .into_boxed();
+    Ok(Incoming(it))
+}
+
 impl IncomingJobConfig {
-    pub fn as_iter<'a>(&'a self, rng: impl Rng + 'a, base_id: usize) -> Result<Incoming<'a>> {
+    pub fn as_iter<'a>(&self, rng: impl Rng + 'a, base_id: usize) -> Result<Incoming<'a>> {
         let it = match self {
             IncomingJobConfig::OneBatch { delay, n_jobs, spec } => one_batch(rng, base_id, *delay, *n_jobs, spec)?,
-            _ => panic!("not implemented"),
+            IncomingJobConfig::Rate { per, unit, spec } => rate(rng, base_id, *per, *unit, spec)?,
         };
         Ok(it)
     }
 }
 
-pub fn from_config<'a>(rng: impl Rng + Clone + 'a, cfg: &'a IncomingConfig) -> Result<Incoming> {
+pub fn from_config<'a, 'b>(rng: impl Rng + Clone + 'a, cfg: &'b IncomingConfig) -> Result<Incoming<'a>> {
     let incoming = match cfg {
         IncomingConfig::Array(models) => {
             let models: Vec<_> = models
@@ -152,7 +172,7 @@ pub enum IncomingJobConfig {
         /// Number of jobs per unit of time
         per: usize,
         /// Unit of time
-        unit: f64,
+        unit: Duration,
         /// Spec of generated jobs
         spec: JobSpec,
     },
@@ -188,7 +208,7 @@ mod tests {
 
     #[test]
     fn one_batch() {
-        let mut model = super::one_batch(
+        let model = super::one_batch(
             get_rng(),
             0,
             Duration(5.),
@@ -200,16 +220,17 @@ mod tests {
         )
         .unwrap();
 
-        let (delay, batch) = model.next().unwrap();
-        assert_eq!(model.next(), None);
-        assert_eq!(delay, Duration(5.));
+        let batches = model.collect_vec();
         assert_eq!(
-            batch,
-            vec![IncomingJob {
-                id: 0,
-                length: Duration(10.),
-                budget: None
-            }]
+            batches,
+            vec![(
+                Duration(5.),
+                vec![IncomingJob {
+                    id: 0,
+                    length: Duration(10.),
+                    budget: None,
+                }]
+            )]
         );
     }
 
@@ -239,29 +260,82 @@ mod tests {
         )
         .unwrap();
 
-        let mut c = super::combined(vec![a, b]);
+        let c = super::combined(vec![a, b]);
+        let batches = c.collect_vec();
         assert_eq!(
-            c.next(),
-            Some((
-                Duration(2.),
-                vec![IncomingJob {
-                    id: 10,
-                    length: Duration(20.),
-                    budget: None
-                }]
-            ))
+            batches,
+            vec![
+                (
+                    Duration(2.),
+                    vec![IncomingJob {
+                        id: 10,
+                        length: Duration(20.),
+                        budget: None
+                    }]
+                ),
+                (
+                    Duration(3.),
+                    vec![IncomingJob {
+                        id: 0,
+                        length: Duration(10.),
+                        budget: None
+                    }]
+                ),
+            ]
         );
+    }
+
+    #[test]
+    fn rate() {
+        let rng = get_rng();
+        let model = super::rate(
+            rng,
+            0,
+            2,
+            Duration(1.),
+            &JobSpec {
+                length: RandomVariable::Constant(10.),
+                budget: None,
+            },
+        )
+        .unwrap();
+
+        // this is a infinite model, so take a few
+        let batches = model.take(2).collect_vec();
         assert_eq!(
-            c.next(),
-            Some((
-                Duration(3.),
-                vec![IncomingJob {
-                    id: 0,
-                    length: Duration(10.),
-                    budget: None
-                }]
-            ))
+            batches,
+            vec![
+                (
+                    Duration(1.),
+                    vec![
+                        IncomingJob {
+                            id: 0,
+                            length: Duration(10.),
+                            budget: None
+                        },
+                        IncomingJob {
+                            id: 1,
+                            length: Duration(10.),
+                            budget: None
+                        },
+                    ]
+                ),
+                (
+                    Duration(1.),
+                    vec![
+                        IncomingJob {
+                            id: 2,
+                            length: Duration(10.),
+                            budget: None
+                        },
+                        IncomingJob {
+                            id: 3,
+                            length: Duration(10.),
+                            budget: None
+                        },
+                    ]
+                ),
+            ]
         );
-        assert_eq!(c.next(), None);
     }
 }

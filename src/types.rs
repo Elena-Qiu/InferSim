@@ -1,15 +1,15 @@
 use std::fmt;
 use std::ops::{Add, AddAssign, Deref, Sub};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 
 /// A time point in simulation
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, From, Display, Serialize, Deserialize)]
 pub struct Time(pub f64);
 
 /// A duration of time in simulation
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, From, Display, Serialize, Deserialize)]
 pub struct Duration(pub f64);
 
 impl Deref for Duration {
@@ -84,7 +84,8 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn missed_deadline(&self, time: Time) -> bool {
+    pub fn missed_deadline(&self, time: impl Into<Time>) -> bool {
+        let time = time.into();
         self.deadline.map(|d| d > time).unwrap_or(false)
     }
 }

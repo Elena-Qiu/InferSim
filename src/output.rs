@@ -2,12 +2,11 @@ use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 
-use desim::Event;
 use serde_json::json;
 
 use crate::config::AppConfigExt as _;
-use crate::simulator::SystemState;
-use crate::types::{Duration, Time};
+use crate::simulator::{Event, SystemState};
+use crate::types::Duration;
 use crate::utils::prelude::*;
 use crate::SimConfig;
 
@@ -27,7 +26,7 @@ fn event_line_with_ending(mut writer: impl io::Write, val: serde_json::Value, en
 
 pub fn render_chrome_trace<'a, E>(events: E) -> Result<()>
 where
-    E: IntoIterator<Item = &'a (Event<SystemState>, SystemState)>,
+    E: IntoIterator<Item = &'a Event>,
 {
     const BATCH_PID: usize = 100;
 
@@ -51,10 +50,10 @@ where
         }),
     )?;
 
-    for (evt, _) in events.into_iter() {
-        let time = Time(evt.time());
-        match evt.state() {
-            SystemState::IncomingJobs { jobs } => {
+    for evt in events.into_iter() {
+        let time = evt.time;
+        match &evt.state {
+            SystemState::IncomingJobs { jobs, .. } => {
                 for job in jobs.iter() {
                     // infer time are drawn as duration on pid 1
                     event_line(
@@ -236,7 +235,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "E",
                             "cat": "queuing",
-                            "ts": evt.time(),
+                            "ts": evt.time,
                             "id": job.id,
                             "tid": 0,
                             "pid": 0,
@@ -254,7 +253,7 @@ where
                         "name": "Past Due Jobs",
                         "ph": "C",
                         "cat": "past_due",
-                        "ts": evt.time(),
+                        "ts": evt.time,
                         "pid": 0,
                         "args": {
                             "past_due": past_due,
@@ -345,16 +344,16 @@ where
 
 pub fn render_job_trace<'a, E>(events: E) -> Result<()>
 where
-    E: IntoIterator<Item = &'a (Event<SystemState>, SystemState)>,
+    E: IntoIterator<Item = &'a Event>,
 {
     let path = config().output_dir()?.file("jobs.csv")?;
     let mut file = BufWriter::new(File::create(path).kind(ErrorKind::JobsCsv)?);
     file.write_all(b"JobId,Length,Admitted,Started,Finished,State\n")
         .kind(ErrorKind::JobsCsv)?;
 
-    for (evt, _) in events.into_iter() {
-        let time = Time(evt.time());
-        match evt.state() {
+    for evt in events.into_iter() {
+        let time = evt.time;
+        match &evt.state {
             SystemState::BatchDone(batch) => {
                 for job in batch.jobs.iter() {
                     file.write_all(

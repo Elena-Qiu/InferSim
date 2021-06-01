@@ -1,10 +1,10 @@
 #![feature(generators, generator_trait, backtrace, control_flow_enum)]
 #![feature(total_cmp)]
 
-use desim::EndCondition;
 use rand_seeder::{Seeder, SipRng};
 
-use crate::simulator::build_simulation;
+use crate::simulator::schedule_loop;
+use crate::types::Time;
 use crate::utils::prelude::*;
 
 mod config;
@@ -15,34 +15,46 @@ mod simulator;
 mod types;
 pub mod utils;
 
+#[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
+enum EndCondition {
+    NoEvents,
+    Time(Time),
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct SimConfig {
     seed: Option<String>,
     incoming: incoming::IncomingConfig,
     scheduler: schedulers::SchedulerConfig,
+    until: EndCondition,
 }
 
 pub fn run_sim() -> Result<()> {
+    let _g = info_span!("sim").entered();
+
     let cfg: SimConfig = config().fetch()?;
-    // setup rng
-    let rng: SipRng = Seeder::from(cfg.seed.as_deref().unwrap_or("stripy zebra")).make_rng();
+    let events = {
+        let _g = info_span!("run").entered();
 
-    // setup incoming jobs
-    let incoming_jobs = incoming::from_config(rng.clone(), &cfg.incoming)?;
+        // setup rng
+        let rng: SipRng = Seeder::from(cfg.seed.as_deref().unwrap_or("stripy zebra")).make_rng();
 
-    // setup scheduler
-    let scheduler = schedulers::from_config(rng, &cfg.scheduler)?;
+        // setup incoming jobs
+        let incoming_jobs = incoming::from_config(rng.clone(), &cfg.incoming)?;
 
-    // build simulator
-    let mut sim = build_simulation(scheduler, incoming_jobs);
+        // setup scheduler
+        let scheduler = schedulers::from_config(rng, &cfg.scheduler)?;
 
-    // run!
-    let _g = info_span!("sim_run").entered();
-    sim = sim.run(EndCondition::NoEvents);
+        // run!
+        schedule_loop(scheduler, incoming_jobs, cfg.until)
+    };
 
     // outputs
-    output::render_chrome_trace(sim.processed_events())?;
-    output::render_job_trace(sim.processed_events())?;
+    {
+        let _g = info_span!("output").entered();
+        output::render_chrome_trace(&events)?;
+        output::render_job_trace(&events)?;
+    }
 
     Ok(())
 }

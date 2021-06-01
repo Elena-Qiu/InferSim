@@ -28,7 +28,7 @@ impl FIFO {
     fn next_batch(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         let batch_size = min(self.batch_size, pending_jobs.len());
         if batch_size == 0 {
-            return SystemState::wait();
+            return SystemState::Idle;
         }
 
         assert!(!self.running);
@@ -54,7 +54,7 @@ impl Scheduler for FIFO {
     fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         // FIFO does not preempt
         if self.running {
-            SystemState::wait()
+            SystemState::Idle
         } else {
             self.next_batch(pending_jobs)
         }
@@ -95,7 +95,7 @@ impl<T: Rng> Random<T> {
     fn next_batch(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         let batch_size = min(self.batch_size, pending_jobs.len());
         if batch_size == 0 {
-            return SystemState::wait();
+            return SystemState::Idle;
         }
 
         assert!(!self.running);
@@ -127,7 +127,7 @@ impl<T: Rng> Scheduler for Random<T> {
     fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
         // Random does not preempt
         if self.running {
-            SystemState::wait()
+            SystemState::Idle
         } else {
             self.next_batch(pending_jobs)
         }
@@ -158,6 +158,7 @@ pub fn from_config(rng: impl Rng + 'static, cfg: &SchedulerConfig) -> Result<Box
                 Box::new(Random::new(rng, *batch_size))
             }
         }
+        SchedulerConfig::Nexus => Box::new(nexus::Nexus),
     })
 }
 
@@ -172,4 +173,5 @@ pub enum SchedulerConfig {
         /// Optional seed. If none, will use the same random generator as the one for incoming jobs
         seed: Option<String>,
     },
+    Nexus,
 }

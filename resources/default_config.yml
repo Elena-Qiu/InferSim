@@ -1,44 +1,57 @@
 ---
+# global random seed, used by incoming generator, and as the default seed for scheduler
 seed: stripy zebra
+# output directory for results
 output_dir: /dev/shm/aetf/workspace/{preset}
 
 logging:
+  # default filter
   filter:
     directives: TRACE
+    # read directives from env var in addition to the directives above
     from_env: RUST_LOG
+  # output to multiple targets
   outputs:
     - enabled: true
+      # the target can be term or file
       target:
         type: term
         name: stderr
+        # whether to switch stdout to stderr if the command needs output
         auto_switch: true
+      # what span events to log in addition to normal events
       span_events:
         - Enter
-    - filter:
+    - enabled: false
+      # target can have different filters than default
+      filter:
         from_env: false
         directives: TRACE
-      enabled: false
       span_events:
         - Enter
       target:
+        type: file
         name: infersim.log
         directory: /tmp
-        type: file
 
 incoming:
-  delay: 0.0
-  spec:
-    length:
-      type: Exp
-      mean: 10.0
-      lambda: 1.5
-      scale: 18.0
-      std_dev: 25.0
-  n_jobs: 500
-  type: OneBatch
+  - delay: 0.0
+    spec:
+      length:
+        type: Exp
+        mean: 10.0
+        lambda: 1.5
+        scale: 18.0
+        std_dev: 25.0
+    n_jobs: 500
+    type: OneBatch
 
 scheduler:
   type: FIFO
   batch_size: 10
+
+# when to stop simulation?
+until:
+  NoEvents
 
 presets:
