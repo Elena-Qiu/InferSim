@@ -17,7 +17,7 @@ pub enum RandomVariable<T> {
 }
 
 impl RandomVariable<f64> {
-    pub fn quantile(percentage: f64) -> f64 {
+    pub fn quantile(&self, percentage: f64) -> f64 {
         // todo
         todo!()
     }

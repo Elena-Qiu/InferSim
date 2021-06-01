@@ -12,6 +12,26 @@ anchors:
     scale: 18.0
 
 presets:
+  my:
+    incoming:
+    - type: "Rate"
+      unit: 10.0
+      per: 2
+      spec: *exp_spec
+    - type: "Rate"
+      unit: 100.0
+      per: 1
+      spec:
+        length:
+          type: "Uniform"
+          low: 150.0
+          high: 200.0
+    scheduler:
+      type: "My"
+      percentile: 99.9
+    until:
+      Time: 300.0
+
   test:
     incoming:
     - type: "OneBatch"
@@ -24,7 +44,6 @@ presets:
       spec: *exp_spec
     scheduler:
       type: "FIFO"
-      batch_size: 1
     until:
       Time: 2.6
 
@@ -36,7 +55,6 @@ presets:
       spec: *exp_spec
     scheduler:
       type: "FIFO"
-      batch_size: 10
 
   rand:
     incoming:

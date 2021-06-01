@@ -9,7 +9,10 @@ use crate::types::{Batch, Job, Time};
 use crate::utils::prelude::*;
 use crate::workers::Worker;
 
-/// The simplest FIFO scheduler, with a fixed batch size of 5
+mod my;
+mod nexus;
+
+/// The simplest FIFO scheduler
 #[derive(Debug)]
 pub struct FIFO {
     workers: Vec<Worker>,
@@ -159,6 +162,7 @@ pub fn from_config(cfg: &SchedulerConfig, rng: impl Rng + 'static, workers: Vec<
             }
         }
         SchedulerConfig::Nexus => Box::new(nexus::Nexus),
+        SchedulerConfig::My { percentile } => Box::new(my::My::new(workers, *percentile)),
     })
 }
 
@@ -171,4 +175,7 @@ pub enum SchedulerConfig {
         seed: Option<String>,
     },
     Nexus,
+    My {
+        percentile: f64,
+    },
 }

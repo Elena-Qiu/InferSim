@@ -1,17 +1,58 @@
 use std::fmt;
-use std::ops::{Add, AddAssign, Deref, Sub};
+use std::ops::{Add, AddAssign, Deref, Sub, SubAssign};
 
 use crate::randvars::RandomVariable;
 use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 /// A time point in simulation
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, From, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, From, Display, Serialize, Deserialize)]
 pub struct Time(pub f64);
 
+impl PartialEq for Time {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.total_cmp(&other.0).is_eq()
+    }
+}
+
+impl Eq for Time {}
+
+impl PartialOrd for Time {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.0.total_cmp(&other.0))
+    }
+}
+
+impl Ord for Time {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
 /// A duration of time in simulation
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, From, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, From, Display, Serialize, Deserialize)]
 pub struct Duration(pub f64);
+
+impl PartialEq for Duration {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.total_cmp(&other.0).is_eq()
+    }
+}
+
+impl Eq for Duration {}
+
+impl PartialOrd for Duration {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.0.total_cmp(&other.0))
+    }
+}
+
+impl Ord for Duration {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
 
 impl Deref for Duration {
     type Target = f64;
@@ -32,6 +73,20 @@ impl Add<Duration> for Time {
 impl AddAssign<Duration> for Time {
     fn add_assign(&mut self, rhs: Duration) {
         self.0 += rhs.0;
+    }
+}
+
+impl Sub<Duration> for Time {
+    type Output = Time;
+
+    fn sub(self, rhs: Duration) -> Self::Output {
+        Time(self.0 - rhs.0)
+    }
+}
+
+impl SubAssign<Duration> for Time {
+    fn sub_assign(&mut self, rhs: Duration) {
+        self.0 -= rhs.0;
     }
 }
 
@@ -60,6 +115,19 @@ where
 
     pub fn value(&self) -> W {
         self.value
+    }
+
+    pub fn dist(&self) -> &RandomVariable<T> {
+        &self.dist
+    }
+}
+
+impl<W> Observation<W, f64>
+where
+    W: Copy + From<f64>,
+{
+    pub fn quantile(&self, per: f64) -> W {
+        self.dist.quantile(per).into()
     }
 }
 
