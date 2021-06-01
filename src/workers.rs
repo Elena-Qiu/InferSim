@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use crate::simulator::SystemState;
 use crate::types::{Batch, Job};
 use crate::utils::prelude::*;
 

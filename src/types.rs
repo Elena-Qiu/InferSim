@@ -1,6 +1,7 @@
 use std::fmt;
 use std::ops::{Add, AddAssign, Deref, Sub};
 
+use crate::randvars::RandomVariable;
 use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 
@@ -42,13 +43,39 @@ impl Sub for Time {
     }
 }
 
+/// One observation of the random variable
+#[derive(Debug, Clone)]
+pub struct Observation<W, T> {
+    value: W,
+    dist: RandomVariable<T>,
+}
+
+impl<W, T> Observation<W, T>
+where
+    W: Copy + From<T>,
+{
+    pub fn new(v: T, dist: RandomVariable<T>) -> Self {
+        Self { value: v.into(), dist }
+    }
+
+    pub fn value(&self) -> W {
+        self.value
+    }
+}
+
+impl<W: PartialEq, T> PartialEq for Observation<W, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
 /// Incoming job, not yet accepted by the system
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncomingJob {
     /// Job ID
     pub id: usize,
     /// Inference length
-    pub length: Duration,
+    pub length: Observation<Duration, f64>,
     /// time budget
     pub budget: Option<Duration>,
 }
@@ -56,8 +83,8 @@ pub struct IncomingJob {
 impl fmt::Display for IncomingJob {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.budget {
-            Some(b) => write!(f, "IncomingJob({}, {:.2}, {:.2})", self.id, self.length, b),
-            None => write!(f, "IncomingJob({}, {:.2}, None)", self.id, self.length),
+            Some(b) => write!(f, "IncomingJob({}, {:.2}, {:.2})", self.id, self.length.value(), b),
+            None => write!(f, "IncomingJob({}, {:.2}, None)", self.id, self.length.value()),
         }
     }
 }
@@ -78,7 +105,7 @@ impl IncomingJob {
 pub struct Job {
     pub id: usize,
     pub admitted: Time,
-    pub length: Duration,
+    pub length: Observation<Duration, f64>,
     /// deadline, absolute
     pub deadline: Option<Time>,
 }
@@ -93,8 +120,21 @@ impl Job {
 impl fmt::Display for Job {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.deadline {
-            Some(d) => write!(f, "Job({}, @{:.2}<{:.2}<{:.2})", self.id, self.admitted, self.length, d),
-            None => write!(f, "Job({}, @{:.2}<{:.2}<None)", self.id, self.admitted, self.length),
+            Some(d) => write!(
+                f,
+                "Job({}, @{:.2}<{:.2}<{:.2})",
+                self.id,
+                self.admitted,
+                self.length.value(),
+                d
+            ),
+            None => write!(
+                f,
+                "Job({}, @{:.2}<{:.2}<None)",
+                self.id,
+                self.admitted,
+                self.length.value()
+            ),
         }
     }
 }
@@ -117,7 +157,7 @@ impl Batch {
     pub fn latency(&self) -> Duration {
         self.jobs
             .iter()
-            .map(|j| j.length)
+            .map(|j| j.length.value())
             .reduce(|a, b| if a < b { b } else { a })
             .expect("Batch can not be empty")
     }

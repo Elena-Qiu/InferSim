@@ -63,13 +63,13 @@ where
                             "ph": "X",
                             "cat": "exec.exact",
                             "ts": time,
-                            "dur": job.length,
+                            "dur": job.length.value(),
                             "id": job.id,
                             "tid": job.id,
                             "pid": 1,
                             "args": {
                                 "job_id": job.id,
-                                "job_len": job.length,
+                                "job_len": job.length.value(),
                             }
                         }),
                     )?;
@@ -86,7 +86,7 @@ where
                             "pid": 0,
                             "args": {
                                 "job_id": job.id,
-                                "job_len": job.length,
+                                "job_len": job.length.value(),
                             }
                         }),
                     )?;
@@ -215,7 +215,7 @@ where
                             "ph": "X",
                             "cat": "exec",
                             "ts": batch.started,
-                            "dur": job.length,
+                            "dur": job.length.value(),
                             "id": job.id,
                             "tid": idx,
                             "pid": BATCH_PID + batch.id,
@@ -359,7 +359,12 @@ where
                     file.write_all(
                         format!(
                             "{},{},{},{},{},{}\n",
-                            job.id, job.length, job.admitted, batch.started, time, "done"
+                            job.id,
+                            job.length.value(),
+                            job.admitted,
+                            batch.started,
+                            time,
+                            "done"
                         )
                         .as_bytes(),
                     )
@@ -369,7 +374,15 @@ where
             SystemState::JobsPastDue(jobs) => {
                 for job in jobs.iter() {
                     file.write_all(
-                        format!("{},{},{},,{},{}\n", job.id, job.length, job.admitted, time, "past_due").as_bytes(),
+                        format!(
+                            "{},{},{},,{},{}\n",
+                            job.id,
+                            job.length.value(),
+                            job.admitted,
+                            time,
+                            "past_due"
+                        )
+                        .as_bytes(),
                     )
                     .kind(ErrorKind::JobsCsv)?;
                 }

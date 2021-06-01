@@ -10,6 +10,7 @@ use crate::utils::prelude::*;
 mod config;
 mod incoming;
 mod output;
+mod randvars;
 mod schedulers;
 mod simulator;
 mod types;
