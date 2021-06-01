@@ -48,7 +48,10 @@ incoming:
 
 scheduler:
   type: FIFO
-  batch_size: 10
+
+workers:
+- batch_size: 10
+  slots: 2
 
 # when to stop simulation?
 until:

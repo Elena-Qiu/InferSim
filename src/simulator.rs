@@ -68,25 +68,19 @@ impl SystemState {
 
 /// Scheduler mostly just react on events
 pub trait Scheduler {
-    fn on_tick(&mut self, now: Time);
-    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState;
-    fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState;
+    fn on_new_jobs(&mut self, now: Time, pending_jobs: &mut VecDeque<Job>) -> Vec<SystemState>;
+    fn on_batch_done(&mut self, now: Time, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> Vec<SystemState>;
 }
 
 impl Scheduler for Box<dyn Scheduler> {
     #[inline]
-    fn on_tick(&mut self, now: Time) {
-        (**self).on_tick(now)
+    fn on_new_jobs(&mut self, now: Time, pending_jobs: &mut VecDeque<Job>) -> Vec<SystemState> {
+        (**self).on_new_jobs(now, pending_jobs)
     }
 
     #[inline]
-    fn on_new_jobs(&mut self, pending_jobs: &mut VecDeque<Job>) -> SystemState {
-        (**self).on_new_jobs(pending_jobs)
-    }
-
-    #[inline]
-    fn on_batch_done(&mut self, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> SystemState {
-        (**self).on_batch_done(batch, pending_jobs)
+    fn on_batch_done(&mut self, now: Time, batch: &Batch, pending_jobs: &mut VecDeque<Job>) -> Vec<SystemState> {
+        (**self).on_batch_done(now, batch, pending_jobs)
     }
 }
 
@@ -156,30 +150,31 @@ pub(crate) fn schedule_loop(mut scheduler: impl Scheduler, incoming_jobs: Incomi
         processed_events.push(event.clone());
         // invoke the scheduler
         {
-            scheduler.on_tick(time);
-            let next = match event.state {
+            let nexts = match event.state {
                 SystemState::IncomingJobs { jobs, .. } => {
                     // new jobs coming in, accept as pending jobs
                     pending_jobs.extend(jobs.into_iter().map(|ij| ij.into_job(time)));
-                    scheduler.on_new_jobs(&mut pending_jobs)
+                    scheduler.on_new_jobs(time, &mut pending_jobs)
                 }
                 SystemState::BatchDone(batch) => {
                     // current batch finished
-                    scheduler.on_batch_done(&batch, &mut pending_jobs)
+                    scheduler.on_batch_done(time, &batch, &mut pending_jobs)
                 }
                 // other states are irrelevant
-                _ => SystemState::Idle,
+                _ => vec![SystemState::Idle],
             };
-            match next.get_effect() {
-                Effect::Timeout(d) => {
-                    let new_event = Event {
-                        time: time + d,
-                        state: next,
-                    };
-                    info!(%new_event, "push event");
-                    future_events.push(Reverse(new_event));
+            for next in nexts.into_iter() {
+                match next.get_effect() {
+                    Effect::Timeout(d) => {
+                        let new_event = Event {
+                            time: time + d,
+                            state: next,
+                        };
+                        info!(%new_event, "push event");
+                        future_events.push(Reverse(new_event));
+                    }
+                    Effect::Wait => {}
                 }
-                Effect::Wait => {}
             }
         };
         // handle incoming

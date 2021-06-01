@@ -14,6 +14,7 @@ mod schedulers;
 mod simulator;
 mod types;
 pub mod utils;
+mod workers;
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 enum EndCondition {
@@ -26,6 +27,7 @@ struct SimConfig {
     seed: Option<String>,
     incoming: incoming::IncomingConfig,
     scheduler: schedulers::SchedulerConfig,
+    workers: Vec<workers::WorkerConfig>,
     until: EndCondition,
 }
 
@@ -42,8 +44,11 @@ pub fn run_sim() -> Result<()> {
         // setup incoming jobs
         let incoming_jobs = incoming::from_config(rng.clone(), &cfg.incoming)?;
 
+        // setup workers
+        let workers = workers::from_config(&cfg.workers);
+
         // setup scheduler
-        let scheduler = schedulers::from_config(rng, &cfg.scheduler)?;
+        let scheduler = schedulers::from_config(&cfg.scheduler, rng, workers)?;
 
         // run!
         schedule_loop(scheduler, incoming_jobs, cfg.until)
