@@ -39,10 +39,9 @@ incoming:
     spec:
       length:
         type: Exp
-        mean: 10.0
         lambda: 1.5
-        scale: 18.0
-        std_dev: 25.0
+        offset: 10.0
+        factor: 18.0
     n_jobs: 500
     type: OneBatch
 

@@ -1,67 +1,328 @@
-use rand::distributions::{Distribution, Uniform};
-use rand::Rng;
-use rand_distr::{Exp, LogNormal, Normal, Poisson, StandardNormal};
+use std::ops::Deref;
 
-use crate::types::Observation;
-use crate::utils::{prelude, BoxIterator, IntoBoxIter};
+use rand::{distributions::Distribution as _, Rng};
+use serde::{Deserialize, Serialize};
+use statrs::distribution::{ContinuousCDF, Empirical, Exp, LogNormal, Normal, Uniform};
+use statrs::statistics::{Distribution, Max, Min};
 
-#[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(tag = "type")]
-pub enum RandomVariable<T> {
-    Constant(T),
-    Uniform { low: T, high: T },
-    Normal { mean: T, std_dev: T },
-    LogNormal { mean: T, std_dev: T },
-    Poisson { lambda: T },
-    Exp { lambda: T, mean: T, scale: T },
+use crate::utils::{prelude::*, BoxIterator, IntoBoxIter};
+
+const fn default_offset() -> f64 {
+    0.0
 }
 
-impl RandomVariable<f64> {
-    pub fn quantile(&self, percentage: f64) -> f64 {
-        // todo
-        todo!()
+const fn default_factor() -> f64 {
+    1.0
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct Transformation {
+    #[serde(default = "default_offset")]
+    offset: f64,
+    #[serde(default = "default_factor")]
+    factor: f64,
+}
+
+impl Transformation {
+    pub fn apply(&self, point: f64) -> f64 {
+        point * self.factor + self.offset
     }
 }
 
-impl RandomVariable<f64>
-where
-    StandardNormal: Distribution<f64>,
-{
-    pub fn sample_iter<'a, W: Copy + From<f64>>(
-        &self,
-        rng: impl Rng + 'a,
-    ) -> prelude::Result<BoxIterator<'a, Observation<W, f64>>> {
-        let dist = *self;
-        let iter: BoxIterator<_> = match self {
-            RandomVariable::Uniform { low, high } => Uniform::new(low.min(*high), high.max(*low))
-                .sample_iter(rng)
-                .map(move |v| Observation::new(v, dist))
-                .into_boxed(),
-            RandomVariable::Normal { mean, std_dev } => Normal::new(*mean, *std_dev)?
-                .sample_iter(rng)
-                .map(move |v| Observation::new(v, dist))
-                .into_boxed(),
-            RandomVariable::LogNormal { mean, std_dev } => LogNormal::new(*mean, *std_dev)?
-                .sample_iter(rng)
-                .map(move |v| Observation::new(v, dist))
-                .into_boxed(),
-            RandomVariable::Poisson { lambda } => Poisson::new(*lambda)?
-                .sample_iter(rng)
-                .map(move |v| Observation::new(v, dist))
-                .into_boxed(),
-            RandomVariable::Exp { lambda, mean, scale } => {
-                let mean = *mean;
-                let scale = *scale;
-                Exp::new(*lambda)?
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+enum RandomVariableInner {
+    Constant(f64),
+    #[serde(deserialize_with = "helpers::uniform::deserialize")]
+    Uniform {
+        #[serde(skip_serializing)]
+        dist: Uniform,
+        low: f64,
+        high: f64,
+        #[serde(flatten)]
+        trans: Transformation,
+    },
+    #[serde(deserialize_with = "helpers::normal::deserialize")]
+    Normal {
+        #[serde(skip_serializing)]
+        dist: Normal,
+        mean: f64,
+        std_dev: f64,
+        #[serde(flatten)]
+        trans: Transformation,
+    },
+    #[serde(deserialize_with = "helpers::log_normal::deserialize")]
+    LogNormal {
+        #[serde(skip_serializing)]
+        dist: LogNormal,
+        location: f64,
+        scale: f64,
+        #[serde(flatten)]
+        trans: Transformation,
+    },
+    #[serde(deserialize_with = "helpers::exp::deserialize")]
+    Exp {
+        #[serde(skip_serializing)]
+        dist: Exp,
+        lambda: f64,
+        #[serde(flatten)]
+        trans: Transformation,
+    },
+    #[serde(deserialize_with = "helpers::empirical::deserialize")]
+    Empirical {
+        #[serde(skip_serializing)]
+        dist: Empirical,
+        samples: Vec<f64>,
+        #[serde(flatten)]
+        trans: Transformation,
+    },
+}
+
+macro_rules! forward {
+    ( $self:expr, { $dist:ident => $dist_res:expr, $constant:ident =>  $constant_res:expr $(,)? } ) => {
+        forward!($self, {
+            ($dist, _trans) => $dist_res,
+            $constant => $constant_res,
+        })
+    };
+
+    ( $self:expr, { ($dist:ident, $trans:ident) => $dist_res:expr, $constant:ident =>  $constant_res:expr $(,)? } ) => {
+        match $self {
+            RandomVariableInner::Constant($constant) => $constant_res,
+            RandomVariableInner::Uniform { dist: $dist, trans: $trans, .. } => $dist_res,
+            RandomVariableInner::Normal { dist: $dist, trans: $trans, .. } => $dist_res,
+            RandomVariableInner::LogNormal { dist: $dist, trans: $trans, .. } => $dist_res,
+            RandomVariableInner::Exp { dist: $dist, trans: $trans, .. } => $dist_res,
+            RandomVariableInner::Empirical { dist: $dist, trans: $trans, .. } => $dist_res,
+        }
+    };
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct RandomVariable(RandomVariableInner);
+
+impl RandomVariable {
+    pub fn constant(c: f64) -> Self {
+        Self(RandomVariableInner::Constant(c))
+    }
+
+    pub fn min(&self) -> f64 {
+        forward!(&self.0, {
+            dist => dist.min(),
+            c => *c,
+        })
+    }
+
+    pub fn max(&self) -> f64 {
+        forward!(&self.0, {
+            dist => dist.max(),
+            c => *c,
+        })
+    }
+
+    pub fn mean(&self) -> f64 {
+        forward!(&self.0, {
+            dist => dist.mean().unwrap(),
+            c => *c,
+        })
+    }
+
+    pub fn quantile(&self, percentage: f64) -> f64 {
+        forward!(&self.0, {
+            dist => dist.inverse_cdf(percentage),
+            c => *c,
+        })
+    }
+
+    pub fn sample_iter<'a, W, R>(&self, rng: R) -> Result<BoxIterator<'a, Observation<W>>>
+    where
+        W: Copy + Deref<Target = f64>,
+        f64: Into<W>,
+        R: Rng + 'a,
+    {
+        let rv = self.clone();
+        let it: BoxIterator<_> = forward!(&self.0, {
+            (dist, trans) => {
+                let trans = *trans;
+                dist
+                    .clone()
                     .sample_iter(rng)
-                    .map(move |s| s * scale + mean)
-                    .map(move |v| Observation::new(v, dist))
+                    .map(move |v| trans.apply(v))
+                    .map(move |v| Observation::new(v, rv.clone()))
                     .into_boxed()
-            }
-            RandomVariable::Constant(v) => std::iter::repeat(*v)
-                .map(move |v| Observation::new(v, dist))
+            },
+            c => std::iter::repeat(*c)
+                .map(move |v| Observation::new(v, rv.clone()))
                 .into_boxed(),
-        };
-        Ok(iter)
+        });
+        Ok(it)
+    }
+}
+
+/// One observation of the random variable
+/// `W` is the wrapper type for `f64`, and f64 should implement `Into<W>`
+#[derive(Debug, Clone)]
+pub struct Observation<W> {
+    value: W,
+    dist: RandomVariable,
+}
+
+impl<W> Observation<W> {
+    pub fn dist(&self) -> &RandomVariable {
+        &self.dist
+    }
+}
+
+impl<W> Observation<W>
+where
+    f64: Into<W>,
+{
+    pub fn new(v: f64, dist: RandomVariable) -> Self {
+        Self { value: v.into(), dist }
+    }
+}
+
+impl<W> Observation<W>
+where
+    W: Copy + Deref<Target = f64>,
+    f64: Into<W>,
+{
+    pub fn value(&self) -> W {
+        self.value
+    }
+}
+
+impl<W> Observation<W>
+where
+    f64: Into<W>,
+{
+    pub fn quantile(&self, per: f64) -> W {
+        self.dist.quantile(per).into()
+    }
+}
+
+impl<W> PartialEq for Observation<W>
+where
+    W: PartialEq + Deref<Target = f64>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.value.eq(&other.value)
+    }
+}
+
+mod helpers {
+    use super::*;
+    use serde::de;
+    use serde::Deserializer;
+
+    pub(super) mod uniform {
+        use super::*;
+
+        pub(in super::super) fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<(Uniform, f64, f64, Transformation), D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct Cfg {
+                low: f64,
+                high: f64,
+                #[serde(flatten)]
+                trans: Transformation,
+            }
+
+            let Cfg { low, high, trans } = Cfg::deserialize(deserializer)?;
+            let dist = Uniform::new(low, high).map_err(de::Error::custom)?;
+            Ok((dist, low, high, trans))
+        }
+    }
+
+    pub(super) mod normal {
+        use super::*;
+
+        pub(in super::super) fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<(Normal, f64, f64, Transformation), D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct Cfg {
+                mean: f64,
+                std_dev: f64,
+                #[serde(flatten)]
+                trans: Transformation,
+            }
+
+            let Cfg { mean, std_dev, trans } = Cfg::deserialize(deserializer)?;
+            let dist = Normal::new(mean, std_dev).map_err(de::Error::custom)?;
+            Ok((dist, mean, std_dev, trans))
+        }
+    }
+
+    pub(super) mod log_normal {
+        use super::*;
+
+        pub(in super::super) fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<(LogNormal, f64, f64, Transformation), D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct Cfg {
+                location: f64,
+                scale: f64,
+                #[serde(flatten)]
+                trans: Transformation,
+            }
+
+            let Cfg { location, scale, trans } = Cfg::deserialize(deserializer)?;
+            let dist = LogNormal::new(location, scale).map_err(de::Error::custom)?;
+            Ok((dist, location, scale, trans))
+        }
+    }
+
+    pub(super) mod exp {
+        use super::*;
+
+        pub(in super::super) fn deserialize<'de, D>(deserializer: D) -> Result<(Exp, f64, Transformation), D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct Cfg {
+                lambda: f64,
+                #[serde(flatten)]
+                trans: Transformation,
+            }
+
+            let Cfg { lambda, trans } = Cfg::deserialize(deserializer)?;
+            let dist = Exp::new(lambda).map_err(de::Error::custom)?;
+            Ok((dist, lambda, trans))
+        }
+    }
+
+    pub(super) mod empirical {
+        use super::*;
+
+        pub(in super::super) fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<(Empirical, Vec<f64>, Transformation), D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct Cfg {
+                samples: Vec<f64>,
+                #[serde(flatten)]
+                trans: Transformation,
+            }
+
+            let Cfg { samples, trans } = Cfg::deserialize(deserializer)?;
+            let dist = Empirical::from_vec(samples.clone());
+            Ok((dist, samples, trans))
+        }
     }
 }

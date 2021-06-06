@@ -1,9 +1,8 @@
 use itertools::Itertools as _;
 use rand::Rng;
-use rand_distr::{Distribution, Exp, LogNormal, Normal, Poisson, StandardNormal, Uniform};
 
 use crate::randvars::RandomVariable;
-use crate::types::{Duration, IncomingJob, Observation, Time};
+use crate::types::{Duration, IncomingJob, Time};
 use crate::utils::prelude::*;
 use crate::utils::{BoxIterator, IntoBoxIter};
 
@@ -144,7 +143,7 @@ pub enum IncomingJobConfig {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct JobSpec {
-    length: RandomVariable<f64>,
+    length: RandomVariable,
     /// SLO budget
     /// If none, no deadline
     budget: Option<f64>,
@@ -155,6 +154,7 @@ mod tests {
     use rand_seeder::{Seeder, SipRng};
 
     use super::*;
+    use crate::randvars::Observation;
 
     fn get_rng() -> SipRng {
         Seeder::from("stripy zebra").make_rng()
@@ -162,14 +162,14 @@ mod tests {
 
     #[test]
     fn one_batch() {
-        let rand_length = RandomVariable::Constant(10.);
+        let rand_length = RandomVariable::constant(10.);
         let model = super::one_batch(
             get_rng(),
             0,
             Duration(5.),
             1,
             &JobSpec {
-                length: rand_length,
+                length: rand_length.clone(),
                 budget: None,
             },
         )
@@ -192,15 +192,15 @@ mod tests {
     #[test]
     fn combined() {
         let rng = get_rng();
-        let rand_length = RandomVariable::Constant(10.);
-        let rand_length2 = RandomVariable::Constant(20.);
+        let rand_length = RandomVariable::constant(10.);
+        let rand_length2 = RandomVariable::constant(20.);
         let a = super::one_batch(
             rng.clone(),
             0,
             Duration(5.),
             1,
             &JobSpec {
-                length: rand_length,
+                length: rand_length.clone(),
                 budget: None,
             },
         )
@@ -211,7 +211,7 @@ mod tests {
             Duration(2.),
             1,
             &JobSpec {
-                length: rand_length2,
+                length: rand_length2.clone(),
                 budget: None,
             },
         )
@@ -245,14 +245,14 @@ mod tests {
     #[test]
     fn rate() {
         let rng = get_rng();
-        let rand_length = RandomVariable::Constant(10.);
+        let rand_length = RandomVariable::constant(10.);
         let model = super::rate(
             rng,
             0,
             2,
             Duration(1.),
             &JobSpec {
-                length: rand_length,
+                length: rand_length.clone(),
                 budget: None,
             },
         )
@@ -268,12 +268,12 @@ mod tests {
                     vec![
                         IncomingJob {
                             id: 0,
-                            length: Observation::new(10., rand_length),
+                            length: Observation::new(10., rand_length.clone()),
                             budget: None
                         },
                         IncomingJob {
                             id: 1,
-                            length: Observation::new(10., rand_length),
+                            length: Observation::new(10., rand_length.clone()),
                             budget: None
                         },
                     ]
@@ -283,7 +283,7 @@ mod tests {
                     vec![
                         IncomingJob {
                             id: 2,
-                            length: Observation::new(10., rand_length),
+                            length: Observation::new(10., rand_length.clone()),
                             budget: None
                         },
                         IncomingJob {

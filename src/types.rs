@@ -1,13 +1,14 @@
-use std::fmt;
-use std::ops::{Add, AddAssign, Deref, Sub, SubAssign};
-
-use crate::randvars::RandomVariable;
-use derive_more::{Display, From};
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::fmt;
+use std::ops::{Add, AddAssign, Sub, SubAssign};
+
+use derive_more::{Deref, DerefMut, Display, From};
+use serde::{Deserialize, Serialize};
+
+use crate::randvars::Observation;
 
 /// A time point in simulation
-#[derive(Debug, Clone, Copy, From, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, From, Display, Deref, DerefMut, Serialize, Deserialize)]
 pub struct Time(pub f64);
 
 impl PartialEq for Time {
@@ -31,7 +32,7 @@ impl Ord for Time {
 }
 
 /// A duration of time in simulation
-#[derive(Debug, Clone, Copy, From, Display, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, From, Display, Deref, DerefMut, Serialize, Deserialize)]
 pub struct Duration(pub f64);
 
 impl PartialEq for Duration {
@@ -51,14 +52,6 @@ impl PartialOrd for Duration {
 impl Ord for Duration {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other).unwrap()
-    }
-}
-
-impl Deref for Duration {
-    type Target = f64;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 
@@ -98,52 +91,13 @@ impl Sub for Time {
     }
 }
 
-/// One observation of the random variable
-#[derive(Debug, Clone)]
-pub struct Observation<W, T> {
-    value: W,
-    dist: RandomVariable<T>,
-}
-
-impl<W, T> Observation<W, T>
-where
-    W: Copy + From<T>,
-{
-    pub fn new(v: T, dist: RandomVariable<T>) -> Self {
-        Self { value: v.into(), dist }
-    }
-
-    pub fn value(&self) -> W {
-        self.value
-    }
-
-    pub fn dist(&self) -> &RandomVariable<T> {
-        &self.dist
-    }
-}
-
-impl<W> Observation<W, f64>
-where
-    W: Copy + From<f64>,
-{
-    pub fn quantile(&self, per: f64) -> W {
-        self.dist.quantile(per).into()
-    }
-}
-
-impl<W: PartialEq, T> PartialEq for Observation<W, T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.value.eq(&other.value)
-    }
-}
-
 /// Incoming job, not yet accepted by the system
 #[derive(Debug, Clone, PartialEq)]
 pub struct IncomingJob {
     /// Job ID
     pub id: usize,
     /// Inference length
-    pub length: Observation<Duration, f64>,
+    pub length: Observation<Duration>,
     /// time budget
     pub budget: Option<Duration>,
 }
@@ -173,7 +127,7 @@ impl IncomingJob {
 pub struct Job {
     pub id: usize,
     pub admitted: Time,
-    pub length: Observation<Duration, f64>,
+    pub length: Observation<Duration>,
     /// deadline, absolute
     pub deadline: Option<Time>,
 }

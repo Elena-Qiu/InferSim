@@ -92,6 +92,3 @@ impl_from_err!(tracing_subscriber::reload::Error, Logging);
 
 // ====== Config ======
 impl_from_err!(config::ConfigError, InvalidConfig);
-impl_from_err!(rand_distr::NormalError, InvalidConfig);
-impl_from_err!(rand_distr::PoissonError, InvalidConfig);
-impl_from_err!(rand_distr::ExpError, InvalidConfig);

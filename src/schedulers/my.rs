@@ -12,7 +12,7 @@ pub struct My {
 }
 
 impl My {
-    pub fn new(mut workers: Vec<Worker>, percentile: f64) -> Self {
+    pub fn new(workers: Vec<Worker>, percentile: f64) -> Self {
         // only support one worker at the time
         assert_eq!(workers.len(), 1);
 

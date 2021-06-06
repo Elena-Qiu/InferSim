@@ -7,9 +7,8 @@ anchors:
   length:
     type: "Exp"
     lambda: 1.5
-    std_dev: 25.0
-    mean: 10.0
-    scale: 18.0
+    offset: 10.0
+    factor: 18.0
 
 presets:
   my:
