@@ -167,12 +167,6 @@ pub struct Observation<W> {
     dist: RandomVariable,
 }
 
-impl<W> Observation<W> {
-    pub fn dist(&self) -> &RandomVariable {
-        &self.dist
-    }
-}
-
 impl<W> Observation<W>
 where
     f64: Into<W>,
@@ -184,11 +178,16 @@ where
 
 impl<W> Observation<W>
 where
-    W: Copy + Deref<Target = f64>,
-    f64: Into<W>,
+    W: Copy,
 {
     pub fn value(&self) -> W {
         self.value
+    }
+}
+
+impl<W> Observation<W> {
+    pub fn dist(&self) -> &RandomVariable {
+        &self.dist
     }
 }
 
@@ -198,6 +197,18 @@ where
 {
     pub fn quantile(&self, per: f64) -> W {
         self.dist.quantile(per).into()
+    }
+
+    pub fn min(&self) -> W {
+        self.dist.min().into()
+    }
+
+    pub fn max(&self) -> W {
+        self.dist.max().into()
+    }
+
+    pub fn mean(&self) -> W {
+        self.dist.mean().into()
     }
 }
 
