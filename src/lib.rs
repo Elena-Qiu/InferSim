@@ -15,7 +15,7 @@ mod schedulers;
 mod simulator;
 mod types;
 pub mod utils;
-mod workers;
+pub mod workers;
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 enum EndCondition {

@@ -180,22 +180,37 @@ pub(crate) fn schedule_loop(mut scheduler: impl Scheduler, incoming_jobs: Incomi
         // handle incoming
         // poll the incoming generator if it's not done until
         // the next incoming job is after the latest batch done
-        while future_events
-            .peek()
-            .map(|e| matches!(e.0.state, SystemState::BatchDone(..)))
-            // if no future event, try polling anyways
-            .unwrap_or(true)
-        {
-            debug!(%time, "polling new incoming jobs");
-            if let Some((new_time, batch)) = incoming_jobs.next() {
-                let new_event = Event {
-                    time: new_time,
-                    state: SystemState::IncomingJobs { jobs: batch },
-                };
-                info!(%new_event, "push event");
-                future_events.push(Reverse(new_event));
-            } else {
-                break;
+        loop {
+            // if the next event is batch done, and when?
+            let peek_is_batch_done = match future_events.peek() {
+                Some(Reverse(Event {
+                    state: SystemState::BatchDone(..),
+                    time,
+                })) => Some(*time),
+                // when no event at all, try polling anyways
+                None => Some(0.0.into()),
+                // next event is not batch done
+                _ => None,
+            };
+            match peek_is_batch_done {
+                None => break,
+                Some(time) => {
+                    debug!(%time, "polling new incoming jobs");
+                    if let Some((new_time, batch)) = incoming_jobs.next() {
+                        let new_event = Event {
+                            time: new_time,
+                            state: SystemState::IncomingJobs { jobs: batch },
+                        };
+                        info!(%new_event, "push event");
+                        future_events.push(Reverse(new_event));
+                        if new_time > time {
+                            // already polled enough events
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
             }
         }
         // end condition
