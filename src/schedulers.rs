@@ -38,9 +38,10 @@ impl FIFO {
                 None => break,
                 Some((id, w)) => {
                     let batch_size = min(w.batch_size(), pending_jobs.len());
-                    let batch = pending_jobs.drain(..batch_size).collect();
+                    let jobs: Vec<_> = pending_jobs.drain(..batch_size).collect();
+                    let batch = Batch { id, jobs, started: now };
                     w.batch_start(&batch);
-                    new_events.push(SystemState::batch(id, now, batch))
+                    new_events.push(SystemState::BatchDone(batch))
                 }
             };
         }
@@ -109,9 +110,10 @@ impl<T: Rng> Random<T> {
                     pending_jobs
                         .make_contiguous()
                         .partial_shuffle(&mut self.rng, batch_size);
-                    let batch = pending_jobs.drain(..batch_size).collect();
+                    let jobs: Vec<_> = pending_jobs.drain(..batch_size).collect();
+                    let batch = Batch { id, jobs, started: now };
                     w.batch_start(&batch);
-                    new_events.push(SystemState::batch(id, now, batch))
+                    new_events.push(SystemState::BatchDone(batch))
                 }
             };
         }

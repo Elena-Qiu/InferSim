@@ -1,5 +1,6 @@
 #![feature(generators, generator_trait, backtrace, control_flow_enum)]
 #![feature(total_cmp)]
+#![feature(vecdeque_binary_search)]
 
 use rand_seeder::{Seeder, SipRng};
 
@@ -12,6 +13,7 @@ mod incoming;
 mod output;
 pub mod randvars;
 mod schedulers;
+mod sim;
 mod simulator;
 mod types;
 pub mod utils;

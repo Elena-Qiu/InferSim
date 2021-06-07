@@ -1,3 +1,4 @@
+use std::cmp::{Ordering, Reverse};
 use std::collections::{BinaryHeap, VecDeque};
 use std::fmt;
 
@@ -5,7 +6,6 @@ use crate::incoming::Incoming;
 use crate::types::{Batch, Duration, IncomingJob, Job, Time};
 use crate::utils::logging::prelude::*;
 use crate::EndCondition;
-use std::cmp::{Ordering, Reverse};
 
 /// The simulation state
 #[derive(Debug, Clone)]
@@ -20,12 +20,6 @@ pub enum SystemState {
     IncomingJobs { jobs: Vec<IncomingJob> },
     /// Some jobs are past due
     JobsPastDue(Vec<Job>),
-}
-
-impl SystemState {
-    pub fn batch(id: usize, now: Time, jobs: Vec<Job>) -> Self {
-        Self::BatchDone(Batch { id, jobs, started: now })
-    }
 }
 
 impl fmt::Display for SystemState {

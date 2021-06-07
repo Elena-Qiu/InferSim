@@ -1,6 +1,8 @@
-use crate::simulator::{Scheduler, SystemState};
-use crate::types::{Batch, Job, Time};
 use std::collections::VecDeque;
+
+use crate::schedulers::Scheduler;
+use crate::simulator::SystemState;
+use crate::types::{Batch, Job, Time};
 
 #[derive(Debug)]
 pub struct Nexus;

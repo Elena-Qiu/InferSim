@@ -1,57 +1,48 @@
-use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use derive_more::{Deref, DerefMut, Display, From};
+use educe::Educe;
+use parse_display::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::randvars::Observation;
+use crate::utils::prelude::*;
 
 /// A time point in simulation
-#[derive(Debug, Clone, Copy, From, Display, Deref, DerefMut, Serialize, Deserialize)]
-pub struct Time(pub f64);
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Educe, Display)]
+#[educe(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Time(
+    #[educe(PartialEq(method = "utils::float::total_eq"))]
+    #[educe(PartialOrd(method = "utils::float::total_cmp"))]
+    #[educe(Ord(method = "f64::total_cmp"))]
+    pub f64,
+);
 
-impl PartialEq for Time {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.total_cmp(&other.0).is_eq()
-    }
-}
-
-impl Eq for Time {}
-
-impl PartialOrd for Time {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.0.total_cmp(&other.0))
-    }
-}
-
-impl Ord for Time {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+impl From<f64> for Time {
+    fn from(v: f64) -> Self {
+        Self(v)
     }
 }
 
 /// A duration of time in simulation
-#[derive(Debug, Clone, Copy, From, Display, Deref, DerefMut, Serialize, Deserialize)]
-pub struct Duration(pub f64);
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Educe, Display)]
+#[educe(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Duration(
+    #[educe(PartialEq(method = "utils::float::total_eq"))]
+    #[educe(PartialOrd(method = "utils::float::total_cmp"))]
+    #[educe(Ord(method = "f64::total_cmp"))]
+    pub f64,
+);
 
-impl PartialEq for Duration {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.total_cmp(&other.0).is_eq()
+impl Duration {
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0.0
     }
 }
 
-impl Eq for Duration {}
-
-impl PartialOrd for Duration {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.0.total_cmp(&other.0))
-    }
-}
-
-impl Ord for Duration {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+impl From<f64> for Duration {
+    fn from(v: f64) -> Self {
+        Self(v)
     }
 }
 
@@ -88,6 +79,31 @@ impl Sub for Time {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Duration(self.0 - rhs.0)
+    }
+}
+
+/// close-open interval. [lb, ub)
+#[derive(Debug, Clone, Copy, Default, Ord, PartialOrd, Eq, PartialEq)]
+pub struct TimeInterval(pub Time, pub Time);
+
+impl TimeInterval {
+    pub fn size(&self) -> Duration {
+        self.1 - self.0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size().is_empty()
+    }
+
+    // TODO: remove the allow after the clippy PR #7266 hits release, which is likely to be 1.52.2
+    // the grouping of the op is correct, but the clippy lint gives a false positive
+    #[allow(clippy::suspicious_operation_groupings)]
+    pub fn is_disjoint(&self, other: &TimeInterval) -> bool {
+        self.is_empty() || other.is_empty() || self.0 >= other.1 || other.0 >= self.1
+    }
+
+    pub fn overlap(&self, other: &TimeInterval) -> bool {
+        !self.is_disjoint(other)
     }
 }
 
@@ -182,5 +198,9 @@ impl Batch {
             .map(|j| j.length.value())
             .reduce(|a, b| if a < b { b } else { a })
             .expect("Batch can not be empty")
+    }
+
+    pub fn to_interval(&self) -> TimeInterval {
+        TimeInterval(self.started, self.started + self.latency())
     }
 }

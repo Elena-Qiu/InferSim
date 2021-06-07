@@ -134,6 +134,7 @@ impl RandomVariable {
         })
     }
 
+    #[allow(clippy::clone_on_copy)]
     pub fn sample_iter<'a, W, R>(&self, rng: R) -> Result<BoxIterator<'a, Observation<W>>>
     where
         W: Copy + Deref<Target = f64>,

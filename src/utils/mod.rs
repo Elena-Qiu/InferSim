@@ -1,6 +1,7 @@
 pub mod app_config;
 mod box_iter;
 mod error;
+pub mod float;
 pub mod logging;
 pub mod panic;
 

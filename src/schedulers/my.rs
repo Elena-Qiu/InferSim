@@ -1,8 +1,10 @@
-use crate::simulator::{Scheduler, SystemState};
-use crate::types::{Batch, Job, Time};
-use crate::workers::Worker;
 use std::cmp::min;
 use std::collections::VecDeque;
+
+use crate::schedulers::Scheduler;
+use crate::simulator::SystemState;
+use crate::types::{Batch, Job, Time};
+use crate::workers::Worker;
 
 #[derive(Debug)]
 pub struct My {
@@ -41,9 +43,10 @@ impl My {
                 None => break,
                 Some((id, w)) => {
                     let batch_size = min(w.batch_size(), with_deadline.len());
-                    let batch = with_deadline.drain(..batch_size).collect();
+                    let jobs = with_deadline.drain(..batch_size).collect();
+                    let batch = Batch { id, jobs, started: now };
                     w.batch_start(&batch);
-                    new_events.push(SystemState::batch(id, now, batch))
+                    new_events.push(SystemState::BatchDone(batch))
                 }
             };
         }
@@ -61,9 +64,10 @@ impl My {
                 None => break,
                 Some((id, w)) => {
                     let batch_size = min(w.batch_size(), best_effort.len());
-                    let batch = best_effort.drain(..batch_size).collect();
+                    let jobs = best_effort.drain(..batch_size).collect();
+                    let batch = Batch { id, jobs, started: now };
                     w.batch_start(&batch);
-                    new_events.push(SystemState::batch(id, now, batch))
+                    new_events.push(SystemState::BatchDone(batch))
                 }
             };
         }
