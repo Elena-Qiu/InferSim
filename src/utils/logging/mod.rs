@@ -96,7 +96,7 @@ impl GlobalLoggingContext {
         layers.add(
             FmtLayer::default()
                 .with_ansi(output.target.supports_color())
-                .with_target(false)
+                .with_target(true)
                 .with_span_events(span_events)
                 .with_timer(ISOTimeFormat)
                 .with_writer(writer),

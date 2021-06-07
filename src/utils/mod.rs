@@ -1,4 +1,5 @@
 pub mod app_config;
+mod batcher;
 mod box_iter;
 mod error;
 pub mod float;
@@ -14,4 +15,5 @@ pub mod prelude {
     pub use super::logging::prelude::*;
 }
 
+pub use batcher::Batcher;
 pub use box_iter::{BoxIterator, IntoBoxIter};

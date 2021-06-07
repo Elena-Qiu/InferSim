@@ -11,6 +11,7 @@ use crate::utils::prelude::*;
 /// A time point in simulation
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Educe, Display)]
 #[educe(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord)]
+#[display("{0:.2}")]
 pub struct Time(
     #[educe(PartialEq(method = "utils::float::total_eq"))]
     #[educe(PartialOrd(method = "utils::float::total_cmp"))]
@@ -27,6 +28,7 @@ impl From<f64> for Time {
 /// A duration of time in simulation
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, Educe, Display)]
 #[educe(Deref, DerefMut, PartialEq, Eq, PartialOrd, Ord)]
+#[display("{0:.2}")]
 pub struct Duration(
     #[educe(PartialEq(method = "utils::float::total_eq"))]
     #[educe(PartialOrd(method = "utils::float::total_cmp"))]
@@ -83,23 +85,32 @@ impl Sub for Time {
 }
 
 /// close-open interval. [lb, ub)
-#[derive(Debug, Clone, Copy, Default, Ord, PartialOrd, Eq, PartialEq)]
-pub struct TimeInterval(pub Time, pub Time);
+#[derive(Debug, Clone, Copy, Default, Ord, PartialOrd, Eq, PartialEq, Display)]
+#[display("{0}+{1}")]
+pub struct TimeInterval(pub Time, pub Duration);
 
 impl TimeInterval {
     pub fn size(&self) -> Duration {
-        self.1 - self.0
+        self.1
     }
 
     pub fn is_empty(&self) -> bool {
-        self.size().is_empty()
+        self.1.is_empty()
+    }
+
+    pub fn lb(&self) -> Time {
+        self.0
+    }
+
+    pub fn ub(&self) -> Time {
+        self.0 + self.1
     }
 
     // TODO: remove the allow after the clippy PR #7266 hits release, which is likely to be 1.52.2
     // the grouping of the op is correct, but the clippy lint gives a false positive
     #[allow(clippy::suspicious_operation_groupings)]
     pub fn is_disjoint(&self, other: &TimeInterval) -> bool {
-        self.is_empty() || other.is_empty() || self.0 >= other.1 || other.0 >= self.1
+        self.is_empty() || other.is_empty() || self.lb() >= other.ub() || other.lb() >= self.ub()
     }
 
     pub fn overlap(&self, other: &TimeInterval) -> bool {
@@ -201,6 +212,6 @@ impl Batch {
     }
 
     pub fn to_interval(&self) -> TimeInterval {
-        TimeInterval(self.started, self.started + self.latency())
+        TimeInterval(self.started, self.latency())
     }
 }

@@ -4,7 +4,6 @@
 
 use rand_seeder::{Seeder, SipRng};
 
-use crate::simulator::schedule_loop;
 use crate::types::Time;
 use crate::utils::prelude::*;
 
@@ -12,9 +11,7 @@ mod config;
 mod incoming;
 mod output;
 pub mod randvars;
-mod schedulers;
 mod sim;
-mod simulator;
 mod types;
 pub mod utils;
 pub mod workers;
@@ -29,18 +26,14 @@ enum EndCondition {
 struct SimConfig {
     seed: Option<String>,
     incoming: incoming::IncomingConfig,
-    scheduler: schedulers::SchedulerConfig,
+    scheduler: sim::schedulers::SchedulerConfig,
     workers: Vec<workers::WorkerConfig>,
     until: EndCondition,
 }
 
 pub fn run_sim() -> Result<()> {
-    let _g = info_span!("sim").entered();
-
     let cfg: SimConfig = config().fetch()?;
     let events = {
-        let _g = info_span!("run").entered();
-
         // setup rng
         let rng: SipRng = Seeder::from(cfg.seed.as_deref().unwrap_or("stripy zebra")).make_rng();
 
@@ -51,17 +44,18 @@ pub fn run_sim() -> Result<()> {
         let workers = workers::from_config(&cfg.workers);
 
         // setup scheduler
-        let scheduler = schedulers::from_config(&cfg.scheduler, rng, workers)?;
+        let scheduler = sim::schedulers::from_config(&cfg.scheduler, rng)?;
 
         // run!
-        schedule_loop(scheduler, incoming_jobs, cfg.until)
+        let sim = sim::Simulator::new(incoming_jobs, scheduler, workers);
+        sim.run(cfg.until);
+        sim.processed_events()
     };
 
     // outputs
     {
-        let _g = info_span!("output").entered();
-        output::render_chrome_trace(&events)?;
-        output::render_job_trace(&events)?;
+        output::render_chrome_trace(events.iter())?;
+        output::render_job_trace(events.iter())?;
     }
 
     Ok(())

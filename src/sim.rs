@@ -17,16 +17,20 @@ use crate::types::{Batch, IncomingJob, Job, Time, TimeInterval};
 use crate::utils::prelude::*;
 use crate::workers::Worker;
 use crate::EndCondition;
+use std::ops::DerefMut;
 
-mod msg;
+pub mod msg;
+pub(crate) mod schedulers;
 
 /// Internal event to drive the SimulationController
 struct RunStep;
+/// Internal event for WorkerController to signal a batch is done
+struct InternalBatchDone;
 
 /// Events processed by various controllers
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Display)]
 #[display("@{time:.2} -> {message}")]
-struct Event {
+pub struct Event {
     pub time: Time,
     pub message: Message,
 }
@@ -37,7 +41,7 @@ macro_rules! define_message {
         #[derive(Debug, Clone, Display, Educe)]
         #[educe(PartialEq, Eq, PartialOrd, Ord)]
         #[display("{}")]
-        enum Message {
+        pub enum Message {
             $(
                 $msg(
                     #[educe(PartialEq(ignore))]
@@ -59,7 +63,7 @@ macro_rules! define_message {
 }
 
 define_message![
-    WakeUpScheduler,
+    WakeUpSchedulerController,
     WakeUpWorkerController,
     WakeUpIncomingController,
     IncomingJobs,
@@ -68,7 +72,7 @@ define_message![
     BatchDone
 ];
 
-struct Simulation {
+pub struct Simulation {
     // states related to the whole simulation
     processed_events: Vec<Event>,
     future_events: BinaryHeap<Reverse<Event>>,
@@ -82,6 +86,7 @@ struct Simulation {
     backend: ActivityId<SimulationController>,
     incoming_controller: ActivityId<IncomingController>,
     worker_controller: ActivityId<WorkerController>,
+    scheduler_controller: ActivityId<SchedulerController>,
 }
 
 type SimulationState = Rc<RefCell<Simulation>>;
@@ -104,27 +109,13 @@ impl SimulationController {
         let mut state = state.borrow_mut();
 
         if let Some(Reverse(event)) = state.future_events.pop() {
-            let _s = debug_span!("event", event.time = %event.time, event.message = %event.message).entered();
+            info!(time = %state.time, %event, "handling event");
             state.time = event.time;
-            // handle past due jobs
-            state.pending_jobs = {
-                let time = state.time;
-                let (past_due, pending_jobs): (VecDeque<_>, _) = state
-                    .pending_jobs
-                    .drain(..)
-                    .partition(|j| j.missed_deadline(time));
-                if !past_due.is_empty() {
-                    state
-                        .backend
-                        .post_event(state.time, msg::PastDue { jobs: past_due.into() });
-                }
-                pending_jobs
-            };
             // record the event now because publishing will consume the event
             state.processed_events.push(event.clone());
             // dispatch events to other components
             match event.message {
-                Message::WakeUpScheduler(inner) => nuts::publish(inner),
+                Message::WakeUpSchedulerController(inner) => nuts::publish(inner),
                 Message::WakeUpWorkerController(inner) => nuts::publish(inner),
                 Message::WakeUpIncomingController(inner) => nuts::publish(inner),
                 Message::IncomingJobs(inner) => nuts::publish(inner),
@@ -139,7 +130,7 @@ impl SimulationController {
     fn new_event(&mut self, state: &mut DomainState, event: Event) {
         let state: &SimulationState = state.get();
         let mut state = state.borrow_mut();
-        info!(%event, "push event");
+        info!(time = %state.time, %event, "push event");
         state.future_events.push(Reverse(event));
     }
 }
@@ -190,6 +181,7 @@ impl IncomingController {
             .unwrap_or(false)
         {
             let (time, jobs) = self.incoming.next().unwrap();
+            info!(time = %state.time, release = %time, jobs.len = jobs.len(), "incoming jobs");
             state
                 .backend
                 .post_event(time, msg::IncomingJobs { jobs });
@@ -227,9 +219,10 @@ impl WorkerController {
             started: batch_start.when,
         };
 
-        state.workers[batch.id].batch_start(&batch);
+        info!(time = %state.time, batch.id = batch.id, batch.jobs.len = batch.jobs.len(), "BatchStart");
 
-        let TimeInterval(_, done) = batch.to_interval();
+        state.workers[batch.id].batch_start(&batch);
+        let done = batch.to_interval().ub();
         state
             .backend
             .post_event(done, msg::BatchDone { batch });
@@ -240,19 +233,113 @@ impl WorkerController {
         let state: &SimulationState = state.get();
         let mut state = state.borrow_mut();
 
+        info!(
+            time = %state.time,
+            batch.id = msg.batch.id,
+            batch.started = %msg.batch.started,
+            "stop batch on worker",
+        );
         state.workers[msg.batch.id].batch_done(&msg.batch);
     }
 }
 
+/// handles some common functionality for schedulers, and adapts any `impl Scheduler` types to the simulator.
+/// handles job past due, and job admission.
+struct SchedulerController {
+    scheduler: Box<dyn schedulers::Scheduler + 'static>,
+}
+
+impl SchedulerController {
+    pub fn new(scheduler: Box<dyn schedulers::Scheduler + 'static>) -> ActivityId<SchedulerController> {
+        let this = nuts::new_domained_activity(Self { scheduler }, &DefaultDomain);
+        this.subscribe_domained(Self::on_incoming_jobs);
+        this.subscribe_domained(Self::on_batch_done);
+
+        this
+    }
+
+    // handles job past due
+    fn on_wake_up(&mut self, state: &mut DomainState, _: &msg::WakeUpSchedulerController) {
+        let state: &SimulationState = state.get();
+        let mut state = state.borrow_mut();
+
+        // handle past due jobs
+        state.pending_jobs = {
+            let time = state.time;
+            let (past_due, pending_jobs): (VecDeque<_>, _) = state
+                .pending_jobs
+                .drain(..)
+                .partition(|j| j.missed_deadline(time));
+            if !past_due.is_empty() {
+                state
+                    .backend
+                    .post_event(state.time, msg::PastDue { jobs: past_due.into() });
+            }
+            pending_jobs
+        };
+
+        // re-schedule next wake up event
+        if let Some(time) = state
+            .pending_jobs
+            .iter()
+            .filter_map(|job| job.deadline)
+            .min()
+        {
+            state
+                .backend
+                .post_event(time, msg::WakeUpSchedulerController);
+        }
+    }
+
+    // admit job into pending job,
+    // and forward to `impl Scheduler`
+    fn on_incoming_jobs(&mut self, state: &mut DomainState, msg: &msg::IncomingJobs) {
+        let state: &SimulationState = state.get();
+        let mut state = state.borrow_mut();
+
+        // new jobs coming in, accept as pending jobs
+        let time = state.time;
+        state.pending_jobs.extend(
+            msg.jobs
+                .iter()
+                .map(|ij| ij.clone().into_job(time)),
+        );
+        info!(
+            time = %state.time,
+            pending_jobs.len = state.pending_jobs.len(),
+            "accepted {} incoming jobs",
+            msg.jobs.len()
+        );
+
+        self.scheduler
+            .on_incoming_jobs(state.deref_mut(), msg);
+    }
+
+    // forward to `impl Scheduler`
+    fn on_batch_done(&mut self, state: &mut DomainState, msg: &msg::BatchDone) {
+        let state: &SimulationState = state.get();
+        let mut state = state.borrow_mut();
+
+        info!(time = %state.time, "forward to scheduler");
+
+        self.scheduler
+            .on_batch_done(state.deref_mut(), msg);
+    }
+}
+
 /// The front-end of the various controllers, glue them together
-struct Simulator {
+pub(crate) struct Simulator {
     backend: ActivityId<SimulationController>,
     state: Rc<RefCell<Simulation>>,
 }
 
 impl Simulator {
     /// Setup simulator on the current thread
-    pub fn new(incoming_jobs: Incoming<'static>, workers: Vec<Worker>) -> Simulator {
+    pub fn new(
+        incoming_jobs: Incoming<'static>,
+        scheduler: Box<dyn schedulers::Scheduler + 'static>,
+        workers: Vec<Worker>,
+    ) -> Simulator {
         // the global simulation controller, for event dispatching, also handles admitting jobs
         let backend = SimulationController::new();
 
@@ -261,6 +348,9 @@ impl Simulator {
 
         // the worker controller tracks execution and generates batch done events
         let worker_controller = WorkerController::new();
+
+        // the scheduler controller drives the `impl Scheduler` scheduler
+        let scheduler_controller = SchedulerController::new(scheduler);
 
         // create states
         let state = Rc::new(RefCell::new(Simulation {
@@ -272,6 +362,7 @@ impl Simulator {
             backend,
             incoming_controller,
             worker_controller,
+            scheduler_controller,
         }));
         nuts::store_to_domain(&DefaultDomain, state.clone());
 
@@ -280,7 +371,7 @@ impl Simulator {
         // seed the events
         backend.post_event(0.0, msg::WakeUpIncomingController);
         backend.post_event(0.0, msg::WakeUpWorkerController);
-        backend.post_event(0.0, msg::WakeUpScheduler);
+        backend.post_event(0.0, msg::WakeUpSchedulerController);
 
         this
     }
@@ -301,5 +392,10 @@ impl Simulator {
         while !self.is_end(&until) {
             self.step();
         }
+    }
+
+    pub fn processed_events(&self) -> Vec<Event> {
+        let state = self.state.borrow();
+        state.processed_events.clone()
     }
 }

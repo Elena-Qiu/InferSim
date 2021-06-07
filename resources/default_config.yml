@@ -46,11 +46,10 @@ incoming:
     type: OneBatch
 
 scheduler:
-  type: FIFO
+  FIFO
 
 workers:
 - batch_size: 10
-  slots: 2
 
 # when to stop simulation?
 until:

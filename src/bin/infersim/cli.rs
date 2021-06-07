@@ -44,7 +44,7 @@ macro_rules! make_command {
                 match self {
                     $(
                         Command::$x(inner) => {
-                            let _s = info_span!(concat!("cmd:", stringify!($x))).entered();
+                            // let _s = info_span!(concat!("cmd:", stringify!($x))).entered();
                             inner.run()
                         },
                     )*

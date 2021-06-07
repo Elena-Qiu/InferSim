@@ -2,7 +2,7 @@ use crate::types::{Batch, IncomingJob, Job, Time};
 
 /// Wake up scheduler
 #[derive(Debug, Clone, Copy)]
-pub struct WakeUpScheduler;
+pub struct WakeUpSchedulerController;
 
 /// Wake up worker controller
 #[derive(Debug, Clone, Copy)]

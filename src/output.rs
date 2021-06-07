@@ -5,7 +5,7 @@ use std::io::{BufWriter, Write};
 use serde_json::json;
 
 use crate::config::AppConfigExt as _;
-use crate::simulator::{Event, SystemState};
+use crate::sim::{msg, Event, Message};
 use crate::types::Duration;
 use crate::utils::prelude::*;
 use crate::SimConfig;
@@ -31,7 +31,9 @@ where
     const BATCH_PID: usize = 100;
 
     let path = config().output_dir()?.file("timeline.json")?;
-    let mut file = BufWriter::new(File::create(path).kind(ErrorKind::ChromeTracing)?);
+    info!("writing chrome trace to {}", path.display());
+
+    let mut file = BufWriter::new(File::create(&path).kind(ErrorKind::ChromeTracing)?);
     file.write_all(b"{\"traceEvents\":[\n")
         .kind(ErrorKind::ChromeTracing)?;
 
@@ -50,10 +52,10 @@ where
         }),
     )?;
 
-    for evt in events.into_iter() {
+    for evt in events {
         let time = evt.time;
-        match &evt.state {
-            SystemState::IncomingJobs { jobs, .. } => {
+        match &evt.message {
+            Message::IncomingJobs(msg::IncomingJobs { jobs, .. }) => {
                 for job in jobs.iter() {
                     // infer time are drawn as duration on pid 1
                     event_line(
@@ -139,7 +141,7 @@ where
                     }
                 }
             }
-            SystemState::BatchDone(batch) => {
+            Message::BatchDone(msg::BatchDone { batch }) => {
                 // the whole batch span
                 event_line(
                     &mut file,
@@ -226,7 +228,7 @@ where
                     )?;
                 }
             }
-            SystemState::JobsPastDue(jobs) => {
+            Message::PastDue(msg::PastDue { jobs }) => {
                 for job in jobs.iter() {
                     // finish the queuing span
                     event_line(
@@ -347,14 +349,16 @@ where
     E: IntoIterator<Item = &'a Event>,
 {
     let path = config().output_dir()?.file("jobs.csv")?;
+    info!("writing job trace to {}", path.display());
+
     let mut file = BufWriter::new(File::create(path).kind(ErrorKind::JobsCsv)?);
     file.write_all(b"JobId,Length,Admitted,Started,Finished,State\n")
         .kind(ErrorKind::JobsCsv)?;
 
-    for evt in events.into_iter() {
+    for evt in events {
         let time = evt.time;
-        match &evt.state {
-            SystemState::BatchDone(batch) => {
+        match &evt.message {
+            Message::BatchDone(msg::BatchDone { batch }) => {
                 for job in batch.jobs.iter() {
                     file.write_all(
                         format!(
@@ -371,7 +375,7 @@ where
                     .kind(ErrorKind::JobsCsv)?;
                 }
             }
-            SystemState::JobsPastDue(jobs) => {
+            Message::PastDue(msg::PastDue { jobs }) => {
                 for job in jobs.iter() {
                     file.write_all(
                         format!(

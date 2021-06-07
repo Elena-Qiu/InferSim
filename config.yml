@@ -26,11 +26,10 @@ presets:
           low: 150.0
           high: 200.0
     scheduler:
-      type: "My"
-      percentile: 99.9
+      My:
+        percentile: 99.9
     until:
       Time: 300.0
-
   test:
     incoming:
     - type: "OneBatch"
@@ -42,7 +41,7 @@ presets:
       per: 2
       spec: *exp_spec
     scheduler:
-      type: "FIFO"
+      FIFO: {}
     until:
       Time: 2.6
 
@@ -53,7 +52,7 @@ presets:
       n_jobs: 500
       spec: *exp_spec
     scheduler:
-      type: "FIFO"
+      FIFO: {}
 
   rand:
     incoming:
@@ -62,4 +61,16 @@ presets:
       n_jobs: 500
       spec: *exp_spec
     scheduler:
-      type: "Random"
+      Random: {}
+
+logging:
+  outputs:
+  - enabled: true
+    # the target can be term or file
+    target:
+      type: term
+      name: stderr
+      auto_switch: true
+    filter:
+      from_env: false
+      directives: DEBUG
