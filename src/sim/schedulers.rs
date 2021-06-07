@@ -35,33 +35,9 @@ impl Scheduler for Box<dyn Scheduler> {
     }
 }
 
-/// put pending jobs onto an available worker
-fn batch_to_available_worker(
-    now: Time,
-    workers: &Vec<Worker>,
-    get_batch: impl FnOnce(usize) -> Vec<Job>,
-) -> Option<msg::BatchStart> {
-    workers
-        .into_iter()
-        // find an idle worker
-        .find(|w| w.timeline().idle(now))
-        // take a batch
-        .and_then(move |w| {
-            let jobs = get_batch(w.batch_size());
-            if jobs.is_empty() {
-                None
-            } else {
-                Some(msg::BatchStart {
-                    when: now,
-                    which: w.id(),
-                    jobs,
-                })
-            }
-        })
-}
-
-fn drain_available_worker(now: Time, workers: &Vec<Worker>, mut get_batch: impl FnMut(usize) -> Vec<Job>) {
-    for w in workers.iter() {
+/// put pending jobs onto all available workers
+fn drain_available_worker(now: Time, workers: &[Worker], mut get_batch: impl FnMut(usize) -> Vec<Job>) {
+    for w in workers {
         if w.timeline().idle(now) {
             let jobs = get_batch(w.batch_size());
             if jobs.is_empty() {
