@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::config::AppConfigExt as _;
 use crate::sim::{msg, Event, Message};
-use crate::types::Duration;
+use crate::types::{Batch, Duration, Job, Time};
 use crate::utils::prelude::*;
 use crate::SimConfig;
 
@@ -351,44 +351,56 @@ where
     let path = config().output_dir()?.file("jobs.csv")?;
     info!("writing job trace to {}", path.display());
 
-    let mut file = BufWriter::new(File::create(path).kind(ErrorKind::JobsCsv)?);
-    file.write_all(b"JobId,Length,Admitted,Started,Finished,State\n")
-        .kind(ErrorKind::JobsCsv)?;
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "snake_case")]
+    enum State {
+        PastDue,
+        Done,
+    }
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct Row {
+        job_id: usize,
+        length: Duration,
+        admitted: Time,
+        started: Option<Time>,
+        finished: Option<Time>,
+        state: State,
+    }
+
+    fn row(job: &Job, started: impl Into<Option<Time>>, finished: impl Into<Option<Time>>) -> Row {
+        let (started, finished, state) = match (started.into(), finished.into()) {
+            (s @ Some(_), f @ Some(_)) => (s, f, State::Done),
+            (s @ None, f @ None) => (s, f, State::PastDue),
+            _ => unreachable!("started and finished has to be in sync"),
+        };
+        Row {
+            job_id: job.id,
+            length: job.length.value(),
+            admitted: job.admitted,
+            started,
+            finished,
+            state,
+        }
+    }
+
+    let mut writer = csv::Writer::from_path(path).kind(ErrorKind::JobsCsv)?;
 
     for evt in events {
         let time = evt.time;
         match &evt.message {
             Message::BatchDone(msg::BatchDone { batch }) => {
                 for job in batch.jobs.iter() {
-                    file.write_all(
-                        format!(
-                            "{},{},{},{},{},{}\n",
-                            job.id,
-                            job.length.value(),
-                            job.admitted,
-                            batch.started,
-                            time,
-                            "done"
-                        )
-                        .as_bytes(),
-                    )
-                    .kind(ErrorKind::JobsCsv)?;
+                    writer
+                        .serialize(row(job, batch.started, time))
+                        .kind(ErrorKind::JobsCsv)?;
                 }
             }
             Message::PastDue(msg::PastDue { jobs }) => {
                 for job in jobs.iter() {
-                    file.write_all(
-                        format!(
-                            "{},{},{},,{},{}\n",
-                            job.id,
-                            job.length.value(),
-                            job.admitted,
-                            time,
-                            "past_due"
-                        )
-                        .as_bytes(),
-                    )
-                    .kind(ErrorKind::JobsCsv)?;
+                    writer
+                        .serialize(row(job, None, None))
+                        .kind(ErrorKind::JobsCsv)?;
                 }
             }
             _ => (),
