@@ -6,7 +6,7 @@ use serde_json::json;
 
 use crate::config::AppConfigExt as _;
 use crate::sim::{msg, Event, Message};
-use crate::types::{Batch, Duration, Job, Time};
+use crate::types::{Duration, Job, Time};
 use crate::utils::prelude::*;
 use crate::SimConfig;
 
@@ -363,6 +363,7 @@ where
         job_id: usize,
         length: Duration,
         admitted: Time,
+        deadline: Option<Time>,
         started: Option<Time>,
         finished: Option<Time>,
         state: State,
@@ -378,6 +379,7 @@ where
             job_id: job.id,
             length: job.length.value(),
             admitted: job.admitted,
+            deadline: job.deadline,
             started,
             finished,
             state,
