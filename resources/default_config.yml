@@ -46,12 +46,12 @@ incoming:
     type: OneBatch
 
 scheduler:
-  FIFO
+  type: FIFO
 
 workers: []
 
 # when to stop simulation?
 until:
-  NoEvents
+  type: NoEvents
 
 presets:

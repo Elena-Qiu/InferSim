@@ -17,9 +17,10 @@ pub mod utils;
 pub mod workers;
 
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[serde(tag = "type")]
 enum EndCondition {
     NoEvents,
-    Time(Time),
+    Time { max: Time },
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]

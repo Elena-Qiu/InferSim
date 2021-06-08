@@ -11,31 +11,33 @@ anchors:
     factor: 18.0
   budget: 200.0
 
-presets:
-  my:
-    incoming:
-    - type: "Rate"
-      unit: 40
-      per: 2
-      bursty: true
-      spec: *exp_spec
-    scheduler:
-      My:
-        percentile: 99.9
-    until:
-      Time: 1000.0
+incoming:
+- type: "Rate"
+  unit: 40
+  per: 2
+  bursty: true
+  spec: *exp_spec
 
-  bursty:
-    incoming:
-    - type: "Rate"
-      unit: 40
-      per: 2
-      bursty: false
-      spec: *exp_spec
+until:
+  type: Time
+  max: 1000
+
+scheduler:
+  type: FIFO
+
+workers:
+- batch_size: 3
+
+presets:
+  fifo: {}
+  rand:
     scheduler:
-      FIFO:
-    until:
-      Time: 1000.0
+      type: Random
+  my:
+    scheduler:
+      type: My
+      percentile: 99.9
+
   test:
     incoming:
     - type: "OneBatch"
@@ -47,9 +49,10 @@ presets:
       per: 2
       spec: *exp_spec
     scheduler:
-      FIFO: {}
+      type: FIFO
     until:
-      Time: 10
+      type: Time
+      max: 10.0
 
   exp:
     incoming:
@@ -58,16 +61,7 @@ presets:
       n_jobs: 200
       spec: *exp_spec
     scheduler:
-      FIFO: {}
-
-  rand:
-    incoming:
-      type: "OneBatch"
-      delay: 0.0
-      n_jobs: 200
-      spec: *exp_spec
-    scheduler:
-      Random: {}
+      type: FIFO
 
 logging:
   outputs:

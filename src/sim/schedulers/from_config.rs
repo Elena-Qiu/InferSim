@@ -19,6 +19,7 @@ pub fn from_config(cfg: &SchedulerConfig, rng: impl Rng + 'static) -> Result<Box
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Display)]
+#[serde(tag = "type")]
 #[display("{}")]
 pub enum SchedulerConfig {
     FIFO,

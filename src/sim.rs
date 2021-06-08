@@ -410,7 +410,7 @@ impl Simulator {
     fn is_end(&self, until: &EndCondition) -> bool {
         let state = self.state.borrow();
         match until {
-            EndCondition::Time(t) => state.time > *t,
+            EndCondition::Time { max: t } => state.time > *t,
             EndCondition::NoEvents => state.future_events.is_empty(),
         }
     }
