@@ -64,6 +64,9 @@ enum RandomVariableInner {
     Exp {
         #[serde(skip_serializing)]
         dist: Exp,
+        /// cache the quantile99
+        #[serde(skip_serializing)]
+        quantile99: f64,
         lambda: f64,
         #[serde(flatten)]
         trans: Transformation,
@@ -128,6 +131,10 @@ impl RandomVariable {
     }
 
     pub fn quantile(&self, percentage: f64) -> f64 {
+        if let RandomVariableInner::Exp { quantile99, .. } = &self.0 {
+            return *quantile99;
+        }
+
         forward!(&self.0, {
             dist => dist.inverse_cdf(percentage),
             c => *c,
@@ -299,7 +306,9 @@ mod helpers {
     pub(super) mod exp {
         use super::*;
 
-        pub(in super::super) fn deserialize<'de, D>(deserializer: D) -> Result<(Exp, f64, Transformation), D::Error>
+        pub(in super::super) fn deserialize<'de, D>(
+            deserializer: D,
+        ) -> Result<(Exp, f64, f64, Transformation), D::Error>
         where
             D: Deserializer<'de>,
         {
@@ -312,7 +321,8 @@ mod helpers {
 
             let Cfg { lambda, trans } = Cfg::deserialize(deserializer)?;
             let dist = Exp::new(lambda).map_err(de::Error::custom)?;
-            Ok((dist, lambda, trans))
+            let quantile99 = dist.inverse_cdf(0.99);
+            Ok((dist, quantile99, lambda, trans))
         }
     }
 
