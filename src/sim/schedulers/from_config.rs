@@ -1,6 +1,8 @@
 use super::*;
+use parse_display::Display;
 
 pub fn from_config(cfg: &SchedulerConfig, rng: impl Rng + 'static) -> Result<Box<dyn Scheduler + 'static>> {
+    info!(scheduler = %cfg, "using");
     Ok(match cfg {
         SchedulerConfig::FIFO => Box::new(FIFO),
         SchedulerConfig::Random { seed } => match seed {
@@ -16,7 +18,8 @@ pub fn from_config(cfg: &SchedulerConfig, rng: impl Rng + 'static) -> Result<Box
     })
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Display)]
+#[display("{}")]
 pub enum SchedulerConfig {
     FIFO,
     Random {

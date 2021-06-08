@@ -9,27 +9,33 @@ anchors:
     lambda: 1.5
     offset: 10.0
     factor: 18.0
+  budget: 200.0
 
 presets:
   my:
     incoming:
     - type: "Rate"
-      unit: 10.0
+      unit: 40
       per: 2
+      bursty: true
       spec: *exp_spec
-    - type: "Rate"
-      unit: 100.0
-      per: 1
-      spec:
-        length:
-          type: "Uniform"
-          low: 150.0
-          high: 200.0
     scheduler:
       My:
         percentile: 99.9
     until:
-      Time: 300.0
+      Time: 1000.0
+
+  bursty:
+    incoming:
+    - type: "Rate"
+      unit: 40
+      per: 2
+      bursty: false
+      spec: *exp_spec
+    scheduler:
+      FIFO:
+    until:
+      Time: 1000.0
   test:
     incoming:
     - type: "OneBatch"
@@ -43,13 +49,13 @@ presets:
     scheduler:
       FIFO: {}
     until:
-      Time: 2.6
+      Time: 10
 
   exp:
     incoming:
       type: "OneBatch"
       delay: 0.0
-      n_jobs: 500
+      n_jobs: 200
       spec: *exp_spec
     scheduler:
       FIFO: {}
@@ -58,7 +64,7 @@ presets:
     incoming:
       type: "OneBatch"
       delay: 0.0
-      n_jobs: 500
+      n_jobs: 200
       spec: *exp_spec
     scheduler:
       Random: {}

@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
 use educe::Educe;
 use parse_display::Display;
@@ -45,6 +45,14 @@ impl Duration {
 impl From<f64> for Duration {
     fn from(v: f64) -> Self {
         Self(v)
+    }
+}
+
+impl Mul<f64> for Duration {
+    type Output = Duration;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Self(self.0 * rhs)
     }
 }
 
@@ -160,9 +168,9 @@ pub struct Job {
 }
 
 impl Job {
-    pub fn missed_deadline(&self, time: impl Into<Time>) -> bool {
-        let time = time.into();
-        self.deadline.map(|d| d > time).unwrap_or(false)
+    pub fn missed_deadline(&self, now: impl Into<Time>) -> bool {
+        let now = now.into();
+        self.deadline.map(|d| d >= now).unwrap_or(false)
     }
 }
 

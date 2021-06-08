@@ -6,3 +6,6 @@ custom_config.toml
 .idea
 config.toml
 log
+.ipynb_checkpoints
+.pyc
+__pycache__

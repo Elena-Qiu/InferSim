@@ -1,4 +1,5 @@
 use itertools::Itertools as _;
+use rand::distributions::Open01;
 use rand::Rng;
 
 use crate::randvars::RandomVariable;
@@ -72,26 +73,44 @@ fn combined<'a>(models: impl IntoIterator<Item = Incoming<'a>>) -> Incoming<'a> 
     Incoming(models.into_boxed())
 }
 
-fn rate<'a>(rng: impl Rng + 'a, base_id: usize, per: usize, unit: Duration, spec: &JobSpec) -> Result<Incoming<'a>> {
+fn rate<'a>(
+    rng: impl Clone + Rng + 'a,
+    base_id: usize,
+    per: usize,
+    unit: Duration,
+    bursty: bool,
+    spec: &JobSpec,
+) -> Result<Incoming<'a>> {
+    info!(per, %unit, bursty, "using incoming=rate");
     let budget = spec.budget.map(Duration);
     let mut it = spec
         .length
-        .sample_iter(rng)?
+        .sample_iter(rng.clone())?
         .zip(base_id..)
         .map(move |(length, id)| IncomingJob { id, length, budget });
-    let it = std::iter::repeat_with(move || {
-        let batch = (&mut it).take(per).collect_vec();
-        (unit, batch)
-    })
-    .into_boxed();
+
+    let batches = std::iter::repeat_with(move || (&mut it).take(per).collect());
+    let it = if bursty {
+        rng.sample_iter(Open01)
+            .map(move |c: f64| unit * -c.ln())
+            .zip(batches)
+            .into_boxed()
+    } else {
+        std::iter::repeat(unit).zip(batches).into_boxed()
+    };
     Ok(Incoming(it))
 }
 
 impl IncomingJobConfig {
-    pub fn as_iter<'a>(&self, rng: impl Rng + 'a, base_id: usize) -> Result<Incoming<'a>> {
+    pub fn as_iter<'a>(&self, rng: impl Rng + Clone + 'a, base_id: usize) -> Result<Incoming<'a>> {
         let it = match self {
             IncomingJobConfig::OneBatch { delay, n_jobs, spec } => one_batch(rng, base_id, *delay, *n_jobs, spec)?,
-            IncomingJobConfig::Rate { per, unit, spec } => rate(rng, base_id, *per, *unit, spec)?,
+            IncomingJobConfig::Rate {
+                per,
+                unit,
+                spec,
+                bursty,
+            } => rate(rng, base_id, *per, *unit, *bursty, spec)?,
         };
         Ok(it)
     }
@@ -138,6 +157,9 @@ pub enum IncomingJobConfig {
         unit: Duration,
         /// Spec of generated jobs
         spec: JobSpec,
+        /// Whether to apply a random exponential transform on the unit duration, creating a bursty effect
+        #[serde(default)]
+        bursty: bool,
     },
 }
 
