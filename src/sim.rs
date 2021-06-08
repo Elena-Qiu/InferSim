@@ -109,8 +109,8 @@ impl SimulationController {
         let mut state = state.borrow_mut();
 
         if let Some(Reverse(event)) = state.future_events.pop() {
-            info!(time = %state.time, %event, "handling event");
             state.time = event.time;
+            info!(time = %state.time, %event, "handling event");
             // record the event now because publishing will consume the event
             state.processed_events.push(event.clone());
             // dispatch events to other components
@@ -247,15 +247,40 @@ impl WorkerController {
 /// handles job past due, and job admission.
 struct SchedulerController {
     scheduler: Box<dyn schedulers::Scheduler + 'static>,
+    next_wakeup: Time,
 }
 
 impl SchedulerController {
     pub fn new(scheduler: Box<dyn schedulers::Scheduler + 'static>) -> ActivityId<SchedulerController> {
-        let this = nuts::new_domained_activity(Self { scheduler }, &DefaultDomain);
+        let this = nuts::new_domained_activity(
+            Self {
+                scheduler,
+                next_wakeup: Default::default(),
+            },
+            &DefaultDomain,
+        );
+        this.subscribe_domained(Self::on_wake_up);
         this.subscribe_domained(Self::on_incoming_jobs);
         this.subscribe_domained(Self::on_batch_done);
 
         this
+    }
+
+    // schedule next wake up event based on earliest past due
+    fn schedule_wake_up(&mut self, state: &Simulation) {
+        if let Some(time) = state
+            .pending_jobs
+            .iter()
+            .filter_map(|job| job.deadline)
+            .min()
+        {
+            if time != self.next_wakeup {
+                self.next_wakeup = time;
+                state
+                    .backend
+                    .post_event(time, msg::WakeUpSchedulerController);
+            }
+        }
     }
 
     // handles job past due
@@ -270,6 +295,14 @@ impl SchedulerController {
                 .pending_jobs
                 .drain(..)
                 .partition(|j| j.missed_deadline(time));
+
+            assert_eq!(state.pending_jobs.len(), 0);
+            info!(
+                past_due.len = past_due.len(),
+                pending_jobs.len = pending_jobs.len(),
+                "past_due stats"
+            );
+
             if !past_due.is_empty() {
                 state
                     .backend
@@ -279,16 +312,7 @@ impl SchedulerController {
         };
 
         // re-schedule next wake up event
-        if let Some(time) = state
-            .pending_jobs
-            .iter()
-            .filter_map(|job| job.deadline)
-            .min()
-        {
-            state
-                .backend
-                .post_event(time, msg::WakeUpSchedulerController);
-        }
+        self.schedule_wake_up(&state);
     }
 
     // admit job into pending job,
@@ -310,6 +334,9 @@ impl SchedulerController {
             "accepted {} incoming jobs",
             msg.jobs.len()
         );
+
+        // re-schedule next wake up
+        self.schedule_wake_up(&state);
 
         self.scheduler
             .on_incoming_jobs(state.deref_mut(), msg);

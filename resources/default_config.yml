@@ -48,8 +48,7 @@ incoming:
 scheduler:
   FIFO
 
-workers:
-- batch_size: 10
+workers: []
 
 # when to stop simulation?
 until:
