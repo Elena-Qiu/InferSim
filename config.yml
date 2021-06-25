@@ -1,6 +1,6 @@
 ---
 seed: stripy zebra
-output_dir: log/{preset}
+output_dir: log/bs4/{preset}
 
 anchors:
 - &exp_spec
@@ -26,7 +26,7 @@ scheduler:
   type: FIFO
 
 workers:
-- batch_size: 3
+- batch_size: 4
 
 presets:
   fifo: {}
@@ -36,7 +36,7 @@ presets:
   my:
     scheduler:
       type: My
-      percentile: 99.9
+      percentile: 0.99
 
   test:
     incoming:

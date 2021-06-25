@@ -362,6 +362,7 @@ where
     struct Row {
         job_id: usize,
         length: Duration,
+        length_p99: Duration,
         admitted: Time,
         deadline: Option<Time>,
         started: Option<Time>,
@@ -378,6 +379,7 @@ where
         Row {
             job_id: job.id,
             length: job.length.value(),
+            length_p99: job.length.quantile(0.99),
             admitted: job.admitted,
             deadline: job.deadline,
             started,

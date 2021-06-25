@@ -21,6 +21,8 @@ pub trait Scheduler {
     fn on_incoming_jobs(&mut self, state: &mut Simulation, msg: &msg::IncomingJobs);
 
     fn on_batch_done(&mut self, state: &mut Simulation, msg: &msg::BatchDone);
+
+    fn on_wake_up(&mut self, state: &mut Simulation) {}
 }
 
 impl Scheduler for Box<dyn Scheduler> {
@@ -98,7 +100,7 @@ impl<T: Rng> Scheduler for Random<T> {
 
 #[derive(Debug)]
 pub struct My {
-    percentile: f64,
+    quantile: f64,
 }
 
 impl My {
@@ -108,9 +110,10 @@ impl My {
             .pending_jobs
             .drain(..)
             .partition(|j| j.deadline.is_some());
-        // assume we always start deadline job until have to, with `percentile` possibility not missing the deadline
+        // assume we always start deadline job until have to, with `quantile` possibility not missing the deadline
         // sort deadline jobs by this start time
-        with_deadline.sort_by_cached_key(|a| a.deadline.unwrap() - a.length.quantile(self.percentile));
+        with_deadline.sort_by_cached_key(|a| a.deadline.unwrap() - a.length.quantile(self.quantile));
+        // FIXME: drain-available_worker always starts request now. But we want to start in the future
         // now take them until the workers are all currently busy
         drain_available_worker(state.time, &state.workers, |s| with_deadline.batch_pop_front(s));
         // take be jobs if there's still spot
@@ -129,6 +132,10 @@ impl Scheduler for My {
     }
 
     fn on_batch_done(&mut self, state: &mut Simulation, _: &msg::BatchDone) {
+        self.next_batch(state)
+    }
+
+    fn on_wake_up(&mut self, state: &mut Simulation) {
         self.next_batch(state)
     }
 }

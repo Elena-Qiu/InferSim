@@ -13,6 +13,7 @@ use nuts::{ActivityId, DefaultDomain, DomainState};
 use parse_display::Display;
 
 use crate::incoming::{Incoming, IncomingAbsolute};
+use crate::sim::schedulers::Scheduler;
 use crate::types::{Batch, IncomingJob, Job, Time, TimeInterval};
 use crate::utils::prelude::*;
 use crate::workers::Worker;
@@ -311,6 +312,8 @@ impl SchedulerController {
             pending_jobs
         };
 
+        self.scheduler.on_wake_up(&mut state);
+
         // re-schedule next wake up event
         self.schedule_wake_up(&state);
     }
@@ -338,8 +341,7 @@ impl SchedulerController {
         // re-schedule next wake up
         self.schedule_wake_up(&state);
 
-        self.scheduler
-            .on_incoming_jobs(state.deref_mut(), msg);
+        self.scheduler.on_incoming_jobs(&mut state, msg);
     }
 
     // forward to `impl Scheduler`
@@ -349,8 +351,7 @@ impl SchedulerController {
 
         info!(time = %state.time, "forward to scheduler");
 
-        self.scheduler
-            .on_batch_done(state.deref_mut(), msg);
+        self.scheduler.on_batch_done(&mut state, msg);
     }
 }
 

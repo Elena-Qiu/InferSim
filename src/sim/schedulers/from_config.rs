@@ -12,9 +12,7 @@ pub fn from_config(cfg: &SchedulerConfig, rng: impl Rng + 'static) -> Result<Box
             }
             _ => Box::new(Random { rng }),
         },
-        SchedulerConfig::My { percentile } => Box::new(My {
-            percentile: *percentile,
-        }),
+        SchedulerConfig::My { percentile } => Box::new(My { quantile: *percentile }),
     })
 }
 
