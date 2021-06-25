@@ -273,6 +273,7 @@ mod tests {
             0,
             2,
             Duration(1.),
+            false,
             &JobSpec {
                 length: rand_length.clone(),
                 budget: None,
