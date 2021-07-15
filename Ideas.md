@@ -1,4 +1,4 @@
-# Algorithm
+## Algorithm
 
 Push execution as late as possible, while not affecting later ones
 
@@ -40,3 +40,6 @@ The algorithm is
     - break, and revert the push point move
   - else: continue
 - take the first consecutive full batches and submit according to their time
+
+## Metrics
+Another metric to consider is the average batch size and hardware utilization
