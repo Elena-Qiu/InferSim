@@ -64,9 +64,9 @@ enum RandomVariableInner {
     Exp {
         #[serde(skip_serializing)]
         dist: Exp,
-        /// cache the quantile99
+        /// cache the raw quantile99
         #[serde(skip_serializing)]
-        quantile99: f64,
+        raw_quantile99: f64,
         lambda: f64,
         #[serde(flatten)]
         trans: Transformation,
@@ -131,8 +131,11 @@ impl RandomVariable {
     }
 
     pub fn quantile(&self, percentage: f64) -> f64 {
-        if let RandomVariableInner::Exp { quantile99, .. } = &self.0 {
-            return *quantile99;
+        if let RandomVariableInner::Exp {
+            raw_quantile99, trans, ..
+        } = &self.0
+        {
+            return trans.apply(*raw_quantile99);
         }
 
         forward!(&self.0, {
