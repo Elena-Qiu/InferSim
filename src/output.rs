@@ -227,10 +227,10 @@ where
                         }),
                     )?;
                 }
-                past_due = chrome_render_past_due(&mut file, past_due, &evt.time, &batch.past_due)?;
+                past_due = chrome_trace_past_due(&mut file, past_due, &evt.time, &batch.past_due)?;
             }
             Message::PastDue(msg::PastDue { jobs }) => {
-                past_due = chrome_render_past_due(&mut file, past_due, &evt.time, jobs)?;
+                past_due = chrome_trace_past_due(&mut file, past_due, &evt.time, jobs)?;
             }
             _ => (),
         }
@@ -313,7 +313,7 @@ where
     Ok(())
 }
 
-fn chrome_render_past_due(
+fn chrome_trace_past_due(
     mut file: &mut BufWriter<File>,
     past_due: usize,
     time: &Time,
