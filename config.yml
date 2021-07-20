@@ -1,6 +1,6 @@
 ---
 seed: stripy zebra
-output_dir: log/bs4/{preset}
+output_dir: log/nsdi/{preset}
 
 anchors:
 - &exp_spec
@@ -62,6 +62,27 @@ presets:
       spec: *exp_spec
     scheduler:
       type: FIFO
+
+  bs10:
+    incoming:
+    - type: "Rate"
+      unit: 100
+      per: 5
+      bursty: true
+      spec:
+        budget: 120.0
+        length:
+          type: "Exp"
+          lambda: 8
+          offset: 80
+          factor: 80
+    scheduler:
+      type: FIFO
+    until:
+      type: Time
+      max: 10000
+    workers:
+    - batch_size: 10
 
 logging:
   outputs:

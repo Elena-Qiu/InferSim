@@ -149,16 +149,16 @@ where
                         "name": "Batch",
                         "ph": "X",
                         "cat": "exec.batch",
-                        "ts": batch.started,
-                        "dur": time - batch.started,
+                        "ts": batch.started(),
+                        "dur": time - batch.started(),
                         "tid": 0,
                         "pid": BATCH_PID + batch.id,
                         "args": {
-                            "batch_size": batch.jobs.len(),
+                            "batch_size": batch.done.len() + batch.past_due.len(),
                         }
                     }),
                 )?;
-                for (idx, job) in batch.jobs.iter().enumerate() {
+                for (idx, job) in batch.done.iter().enumerate() {
                     let idx = idx + 1;
                     // flow arrow start
                     event_line(
@@ -167,7 +167,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "s",
                             "cat": "scheduling",
-                            "ts": batch.started,
+                            "ts": batch.started(),
                             "id": job.id,
                             "tid": job.id,
                             "pid": 0,
@@ -183,7 +183,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "E",
                             "cat": "queuing",
-                            "ts": batch.started,
+                            "ts": batch.started(),
                             "id": job.id,
                             "tid": job.id,
                             "pid": 0,
@@ -200,7 +200,7 @@ where
                             "ph": "f",
                             "bp": "e",
                             "cat": "scheduling",
-                            "ts": batch.started + Duration(0.01),
+                            "ts": batch.started() + Duration(0.01),
                             "id": job.id,
                             "tid": idx,
                             "pid": BATCH_PID + batch.id,
@@ -216,7 +216,7 @@ where
                             "name": format!("Job {}", job.id),
                             "ph": "X",
                             "cat": "exec",
-                            "ts": batch.started,
+                            "ts": batch.started(),
                             "dur": job.length.value(),
                             "id": job.id,
                             "tid": idx,
@@ -227,41 +227,10 @@ where
                         }),
                     )?;
                 }
+                past_due = chrome_render_past_due(&mut file, past_due, &evt.time, &batch.past_due)?;
             }
             Message::PastDue(msg::PastDue { jobs }) => {
-                for job in jobs.iter() {
-                    // finish the queuing span
-                    event_line(
-                        &mut file,
-                        json!({
-                            "name": format!("Job {}", job.id),
-                            "ph": "E",
-                            "cat": "queuing",
-                            "ts": evt.time,
-                            "id": job.id,
-                            "tid": 0,
-                            "pid": 0,
-                            "args": {
-                                "job_id": job.id,
-                            }
-                        }),
-                    )?;
-                }
-                // update the counter
-                past_due += jobs.len();
-                event_line(
-                    &mut file,
-                    json!({
-                        "name": "Past Due Jobs",
-                        "ph": "C",
-                        "cat": "past_due",
-                        "ts": evt.time,
-                        "pid": 0,
-                        "args": {
-                            "past_due": past_due,
-                        }
-                    }),
-                )?;
+                past_due = chrome_render_past_due(&mut file, past_due, &evt.time, jobs)?;
             }
             _ => (),
         }
@@ -344,6 +313,47 @@ where
     Ok(())
 }
 
+fn chrome_render_past_due(
+    mut file: &mut BufWriter<File>,
+    past_due: usize,
+    time: &Time,
+    jobs: &Vec<Job>,
+) -> Result<usize> {
+    for job in jobs.iter() {
+        // finish the queuing span
+        event_line(
+            &mut file,
+            json!({
+                "name": format!("Job {}", job.id),
+                "ph": "E",
+                "cat": "queuing",
+                "ts": time,
+                "id": job.id,
+                "tid": 0,
+                "pid": 0,
+                "args": {
+                    "job_id": job.id,
+                }
+            }),
+        )?;
+    }
+    // update the counter
+    event_line(
+        &mut file,
+        json!({
+            "name": "Past Due Jobs",
+            "ph": "C",
+            "cat": "past_due",
+            "ts": time,
+            "pid": 0,
+            "args": {
+                "past_due": past_due,
+            }
+        }),
+    )?;
+    Ok(past_due + jobs.len())
+}
+
 pub fn render_job_trace<'a, E>(events: E) -> Result<()>
 where
     E: IntoIterator<Item = &'a Event>,
@@ -370,12 +380,11 @@ where
         state: State,
     }
 
-    fn row(job: &Job, started: impl Into<Option<Time>>, finished: impl Into<Option<Time>>) -> Row {
-        let (started, finished, state) = match (started.into(), finished.into()) {
-            (s @ Some(_), f @ Some(_)) => (s, f, State::Done),
-            (s @ None, f @ None) => (s, f, State::PastDue),
-            _ => unreachable!("started and finished has to be in sync"),
-        };
+    fn row(job: &Job, started: impl Into<Option<Time>>, finished: impl Into<Option<Time>>, state: State) -> Row {
+        let (started, finished) = (started.into(), finished.into());
+        if started.is_some() != finished.is_some() {
+            unreachable!("started and finished has to be in sync");
+        }
         Row {
             job_id: job.id,
             length: job.length.value(),
@@ -394,16 +403,21 @@ where
         let time = evt.time;
         match &evt.message {
             Message::BatchDone(msg::BatchDone { batch }) => {
-                for job in batch.jobs.iter() {
+                for job in batch.done.iter() {
                     writer
-                        .serialize(row(job, batch.started, time))
+                        .serialize(row(job, batch.started(), time, State::Done))
+                        .kind(ErrorKind::JobsCsv)?;
+                }
+                for job in batch.past_due.iter() {
+                    writer
+                        .serialize(row(job, batch.started(), time, State::PastDue))
                         .kind(ErrorKind::JobsCsv)?;
                 }
             }
             Message::PastDue(msg::PastDue { jobs }) => {
                 for job in jobs.iter() {
                     writer
-                        .serialize(row(job, None, None))
+                        .serialize(row(job, None, None, State::PastDue))
                         .kind(ErrorKind::JobsCsv)?;
                 }
             }
