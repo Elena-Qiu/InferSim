@@ -53,6 +53,7 @@ serde_json = "1.0.64"
 gen-iter = "0.2.0"
 itertools = "0.10.0"
 csv = "1.1.6"
+approx = "0.5.0"
 
 [features]
 default = []

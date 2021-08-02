@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use approx::ulps_eq;
 use rand::{distributions::Distribution as _, Rng};
 use serde::{Deserialize, Serialize};
 use statrs::distribution::{ContinuousCDF, Empirical, Exp, LogNormal, Normal, Uniform};
@@ -64,9 +65,9 @@ enum RandomVariableInner {
     Exp {
         #[serde(skip_serializing)]
         dist: Exp,
-        /// cache the quantile99
+        /// cache the raw quantile99
         #[serde(skip_serializing)]
-        quantile99: f64,
+        raw_quantile99: f64,
         lambda: f64,
         #[serde(flatten)]
         trans: Transformation,
@@ -131,12 +132,21 @@ impl RandomVariable {
     }
 
     pub fn quantile(&self, percentage: f64) -> f64 {
-        if let RandomVariableInner::Exp { quantile99, .. } = &self.0 {
-            return *quantile99;
+        if let RandomVariableInner::Exp {
+            raw_quantile99, trans, ..
+        } = &self.0
+        {
+            if ulps_eq!(percentage, 0.99) {
+                return trans.apply(*raw_quantile99);
+            }
         }
 
         forward!(&self.0, {
-            dist => dist.inverse_cdf(percentage),
+            (dist, trans) => {
+                let raw = dist.inverse_cdf(percentage);
+                dbg!(raw);
+                trans.apply(raw)
+            },
             c => *c,
         })
     }
@@ -346,5 +356,29 @@ mod helpers {
             let dist = Empirical::from_vec(samples.clone());
             Ok((dist, samples, trans))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transformation_works() {
+        let lambda = 1.5;
+        let dist = Exp::new(lambda).unwrap();
+        let trans = Transformation {
+            offset: 10.0,
+            factor: 100.0,
+        };
+        let var = RandomVariable(RandomVariableInner::Exp {
+            dist,
+            lambda,
+            trans,
+            raw_quantile99: dist.inverse_cdf(0.99),
+        });
+
+        assert_eq!(var.quantile(0.99), trans.apply(dist.inverse_cdf(0.99)));
+        assert_eq!(var.quantile(0.8), trans.apply(dist.inverse_cdf(0.8)));
     }
 }

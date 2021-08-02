@@ -214,16 +214,12 @@ impl WorkerController {
         let state: &SimulationState = state.get();
         let mut state = state.borrow_mut();
 
-        let batch = Batch {
-            id: batch_start.which,
-            jobs: batch_start.jobs.clone(),
-            started: batch_start.when,
-        };
+        let batch: Batch = batch_start.clone().into();
 
-        info!(time = %state.time, batch.id = batch.id, batch.jobs.len = batch.jobs.len(), "BatchStart");
+        info!(time = %state.time, batch.id = batch.id, batch.done.len = batch.done.len(), batch.past_due.len = batch.past_due.len(), "BatchStart");
 
         state.workers[batch.id].batch_start(&batch);
-        let done = batch.to_interval().ub();
+        let done = batch.interval.ub();
         state
             .backend
             .post_event(done, msg::BatchDone { batch });
@@ -237,10 +233,35 @@ impl WorkerController {
         info!(
             time = %state.time,
             batch.id = msg.batch.id,
-            batch.started = %msg.batch.started,
+            batch.started = %msg.batch.started(),
             "stop batch on worker",
         );
         state.workers[msg.batch.id].batch_done(&msg.batch);
+    }
+}
+
+impl From<msg::BatchStart> for Batch {
+    fn from(bs: msg::BatchStart) -> Self {
+        // calculate latency
+        let latency = bs
+            .jobs
+            .iter()
+            .map(|j| j.length.value())
+            .reduce(|a, b| if a < b { b } else { a })
+            .expect("Batch can not be empty");
+        // split jobs into done and past due
+        let finished = bs.when + latency;
+        let (past_due, done) = bs
+            .jobs
+            .into_iter()
+            .partition(|job| job.missed_deadline(finished));
+        // save info
+        Self {
+            id: bs.which,
+            interval: TimeInterval(bs.when, latency),
+            done,
+            past_due,
+        }
     }
 }
 

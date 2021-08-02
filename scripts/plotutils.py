@@ -588,7 +588,8 @@ def job_timeline(workers, begin, end,
              ax=None,
              marker_begin=None, marker_end=None,
              markersize=None,
-             group_num=2, group_radius=.3):
+             group_num=0, group_radius=.3,
+             numeric_workers=False):
     '''Draw horizontal timelines of jobs
         Args:
             These are usually a column of a dataframe
@@ -598,7 +599,8 @@ def job_timeline(workers, begin, end,
             end: list
             groupby: list
             
-            The following two controls small offset in y_pos, to create a wave like shape
+            The following two controls small offset in y_pos, to create a wave like shape,
+            set group_num to 0 to disable this
             
             group_num: int
             group_radius: float
@@ -608,7 +610,7 @@ def job_timeline(workers, begin, end,
     if marker_end is None:
         marker_end = default_marker_end()
 
-    if int(group_num) <= 0:
+    if int(group_num) < 0:
         raise ValueError(f'group_num should be a positive integer, but got {group_num}')
     group_num = int(group_num)
 
@@ -626,21 +628,26 @@ def job_timeline(workers, begin, end,
                              f' but got {lens}')
 
     # create y_pos according to workers, so workers doesn't has to be numeric
-    y_values, y_pos = np.unique(workers, return_inverse=True)
-    y_pos = y_pos.astype(np.float64)
+    if numeric_workers:
+        y_values = workers
+        y_pos = workers.copy()
+    else:
+        y_values, y_pos = np.unique(workers, return_inverse=True)
+        y_pos = y_pos.astype(np.float64)
 
     # adjust y_pos according to a wave like shape around original y_pos,
     # the offset should be changing based on the index within a particular y_value
-    offset_pattern = np.concatenate([
-        np.arange(0, group_num),
-        np.arange(group_num, -group_num, step=-1),
-        np.arange(-group_num, 0)
-    ])
-    for worker in y_values:
-        mask = workers == worker
-        num = len(workers[mask])
-        offset = np.tile(offset_pattern, (num + len(offset_pattern) - 1) // len(offset_pattern))[:num]
-        y_pos[mask] += offset * group_radius / group_num
+    if group_num > 0:
+        offset_pattern = np.concatenate([
+            np.arange(0, group_num),
+            np.arange(group_num, -group_num, step=-1),
+            np.arange(-group_num, 0)
+        ])
+        for worker in y_values:
+            mask = workers == worker
+            num = len(workers[mask])
+            offset = np.tile(offset_pattern, (num + len(offset_pattern) - 1) // len(offset_pattern))[:num]
+            y_pos[mask] += offset * group_radius / group_num
 
     if ax is None:
         _, ax = plt.subplots()

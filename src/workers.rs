@@ -82,7 +82,7 @@ impl Worker {
 
     pub fn batch_start(&mut self, batch: &Batch) {
         assert_eq!(self.id, batch.id);
-        let interval = batch.to_interval();
+        let interval = batch.interval;
         let occupied = self.timeline.occupied(&interval);
         assert!(
             occupied.is_empty(),
@@ -95,8 +95,7 @@ impl Worker {
 
     pub fn batch_done(&mut self, batch: &Batch) {
         assert_eq!(self.id, batch.id);
-        let interval = batch.to_interval();
-        self.timeline.remove(&interval);
+        self.timeline.remove(&batch.interval);
     }
 
     pub fn timeline(&self) -> &Timeline {

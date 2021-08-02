@@ -199,27 +199,29 @@ impl fmt::Display for Job {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Batch {
     pub id: usize,
-    pub jobs: Vec<Job>,
-    pub started: Time,
+    pub interval: TimeInterval,
+    pub done: Vec<Job>,
+    pub past_due: Vec<Job>,
 }
 
 impl fmt::Display for Batch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Batch {{ jobs.len: {} }}", self.jobs.len())
+        write!(
+            f,
+            "Batch {{ done.len: {}, past_due.len: {} }}",
+            self.done.len(),
+            self.past_due.len()
+        )
     }
 }
 
 impl Batch {
     /// the batch processing time is the max of all jobs in the batch
     pub fn latency(&self) -> Duration {
-        self.jobs
-            .iter()
-            .map(|j| j.length.value())
-            .reduce(|a, b| if a < b { b } else { a })
-            .expect("Batch can not be empty")
+        self.interval.1
     }
-
-    pub fn to_interval(&self) -> TimeInterval {
-        TimeInterval(self.started, self.latency())
+    /// when did the batch started
+    pub fn started(&self) -> Time {
+        self.interval.0
     }
 }
