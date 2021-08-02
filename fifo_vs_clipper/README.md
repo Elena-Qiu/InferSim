@@ -29,6 +29,9 @@
 - per: 5
 - max: 40000
 
+### Plots
+The plots are in the folder `fifo_vs_clipper/plot`
+
 ### Problem
 
 I make a little change to the `async_dynamic_test.py `. In the function `incoming_file`, I add one more `yield batch, delay_ms` to launch the final batch. However, this final batch always gets error after running the async_dynamic_test, which is shown in the `log/bs20/clipper/latency.csv`.
