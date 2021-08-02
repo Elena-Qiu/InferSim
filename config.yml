@@ -1,32 +1,56 @@
 ---
 seed: stripy zebra
-output_dir: log/bs4/{preset}
+output_dir: log/bs20/{preset}
+
+# Average Length = 100
 
 anchors:
 - &exp_spec
   length:
     type: "Exp"
-    lambda: 1.5
-    offset: 10.0
-    factor: 18.0
-  budget: 200.0
+    lambda: 8
+    offset: 80
+    factor: 80
+  budget: 130.0
 
 incoming:
 - type: "Rate"
-  unit: 40
-  per: 2
+  unit: 250
+  per: 5
   bursty: true
   spec: *exp_spec
 
 until:
   type: Time
-  max: 1000
+  max: 20000
+
+## Average Length = 200
+
+# anchors:
+# - &exp_spec
+#   length:
+#     type: "Exp"
+#     lambda: 6
+#     offset: 160
+#     factor: 100
+#   budget: 230.0
+
+# incoming:
+# - type: "Rate"
+#   unit: 500
+#   per: 5
+#   bursty: true
+#   spec: *exp_spec
+
+# until:
+#   type: Time
+#   max: 40000
 
 scheduler:
   type: FIFO
 
 workers:
-- batch_size: 4
+- batch_size: 20
 
 presets:
   fifo: {}
