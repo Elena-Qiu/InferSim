@@ -13,7 +13,7 @@
 
 - offset: 80
 - factor: 80
-- budget: 130/260/390
+- budget: 126/252/378
 - unit: 250
 - per: 5s
 - max: 20000
@@ -24,7 +24,7 @@
 
 - offset: 160
 - factor: 100
-- budget: 230/460/690
+- budget: 236/473/710
 - unit: 500
 - per: 5
 - max: 40000
